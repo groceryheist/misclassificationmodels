@@ -1,0 +1,23 @@
+Package: misclassificationmodels
+Title: Correction for Misclassification
+Version: 0.0.1
+Authors@R: 
+    c(
+    person("Nathan", "TeBlunthuis", , "nathante@uw.edu", role = c("aut"), comment = c(ORCID = "0000-0002-3333-5013")),
+    person("Valerie", "Hase", , "valerie.hase@ifkw.lmu.de", role = c("aut"), comment = c(ORCID = "0000-0001-6656-4894")),
+    person("Chung-hong", "Chan", , "chainsawtiney@gmail.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-6232-7530"))
+    )	   	   
+Description: Correction for Misclassification. Currently, this package provides an MLE-based correction method.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.0
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Depends: 
+    R (>= 2.10)
+LazyData: true
+Imports: 
+    dplyr,
+    matrixStats

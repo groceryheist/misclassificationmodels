@@ -1,0 +1,97 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+WIP
+
+## Installation
+
+You can install the development version of `misclassificationmodels` like so:
+
+``` r
+remotes::install_github("chainsawriot/misclassificationmodels")
+```
+
+## Example
+
+This package provides an example dataset (5000 observations)
+
+```{r researchdata}
+library(misclassificationmodels)
+head(research_data)
+```
+
+Suppose we are interested in the relationship between `y` and `x`. `x` is not in this dataset, because it is perhaps expensive to collect. Instead, we have another variable `w`, which is from an automated classifier trained to predict `x`. It is known that the automated classifier misclassifies `x`. In order to find out the extent of misclassification, we produced another dataset `val_data` (300 observations). 
+
+```{r val_data}
+head(val_data)
+```
+
+In this dataset, we have the misclassified variable `w` and the variable `x` (e.g. from human coders using [oolong](https://github.com/chainsawriot/oolong)). The variable `w` is a **proxy**, whereas `x` is the **ground truth** of the proxy. We verify that the automated classifer did actually misclassify quite badly:
+
+```{r misclassify}
+caret::confusionMatrix(table(w = val_data$w, x = val_data$x), mode = "prec_recall", positive = "1")
+```
+
+Yes: ["Validate, validate, validate."](https://web.stanford.edu/~jgrimmer/tad2.pdf)
+
+## Our approach
+
+The function `glm_fixit()` does regression analysis but also corrects for misclassification in proxy using the information in validation data. The method is based on the general likelihood modeling framework drawn from Carroll et al. (2006). The function is very simular to `glm()` but with two changes:
+
+1. The formula interface has been extended with the double-pipe operator to denote proxy variable. For example, `x || w` indicates `w` is the proxy of the ground truth `x`.
+2. The validation data (with both proxy and ground truth, as well as another variables, e.g. `y` and `z`) must be provided as `data2`
+
+```{r}
+res <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_data)
+res
+```
+
+```{r}
+summary(res)
+```
+
+If you have information on the data generation processes of proxy and ground truth, you can overide the default.
+
+```{r}
+res2 <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_data,
+                  proxy_formula = w ~ x*y*z, proxy_family = binomial(),
+                  truth_formula = x ~ z, truth_family = binomial())
+summary(res2)
+```
+
+## What is "Naive Estimator"?
+
+One can model the relationship between `y` and `x` by assuming `w` to be a misclassification-free proxy, which many studies did assume to be so. This approach is called "naive".
+
+```{r naive}
+glm(y~w+z, data = research_data)
+```
+
+The "naive" estimator suggests the regression coefficient to be -.4 [^1], which is heavily biased by misclassification. Also, it is not biased towards zero (the so-called "attenuation bias") but away from zero. It is because the misclassification is differential, i.e. not random.
+
+## What is "Feasible Estimator"?
+
+One can also analyze the validation data only. This approach gives unbiased but imprecise estimates.
+
+```{r}
+glm(y~x+z, data = val_data)
+```
+
+## References
+
+1. Carroll, R. J., Ruppert, D., Stefanski, L. A., & Crainiceanu, C. M. (2006). Measurement Error in Nonlinear Models (2nd ed.). Chapman & Hall/CRC.
+
+---
+[^1]: We (the authors of this package) know that it is heavily biased because `research_data` and `val_data` are synthetic datasets by us. We set the regression coefficient of `x` at exactly **0**. If H0 is no association between `x` and `y` and `w` is assumed to be a misclassification-free proxy of `x`, one would commit a Type I error.
