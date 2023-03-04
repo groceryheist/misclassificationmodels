@@ -1,6 +1,6 @@
 Package: misclassificationmodels
 Title: Correction for Misclassification
-Version: 0.0.1
+Version: 0.0.2
 Authors@R: 
     c(
     person("Nathan", "TeBlunthuis", , "nathante@uw.edu", role = c("aut"), comment = c(ORCID = "0000-0002-3333-5013")),
@@ -11,7 +11,7 @@ Description: Correction for Misclassification. Currently, this package provides 
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.0
+RoxygenNote: 7.2.3
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
@@ -19,5 +19,5 @@ Depends:
     R (>= 2.10)
 LazyData: true
 Imports: 
-    dplyr,
-    matrixStats
+    matrixStats,
+    vctrs

@@ -89,10 +89,10 @@ validate.”](https://web.stanford.edu/~jgrimmer/tad2.pdf)
 ## Our approach
 
 The function `glm_fixit()` does regression analysis but also corrects
-for misclassification in proxy using the information in validation data.
-The method is based on the general likelihood modeling framework drawn
-from Carroll et al. (2006). The function is very similar to `glm()` but
-with two changes:
+for misclassification in proxy using the validation data. The method is
+based on the general likelihood modeling framework drawn from Carroll et
+al. (2006). The function is very similar to `glm()` but with two
+changes:
 
 1.  The formula interface has been extended with the double-pipe
     operator to denote proxy variable. For example, `x || w` indicates
@@ -107,7 +107,7 @@ res <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_dat
 res
 #> Corrected Estimator:
 #> (Intercept)           x           z 
-#>  0.01503172 -0.03456093 -0.30304487 
+#>  0.01473294 -0.03398086 -0.30307115 
 #> Feasible Estimator:
 #> (Intercept)           x           z 
 #>  0.03213542 -0.02689811 -0.32240014 
@@ -120,15 +120,15 @@ res
 summary(res)
 #> Coefficients (Corrected Estimator): 
 #>                      Estimate       2.5 %      97.5 %
-#> (Intercept)        0.01503172 -0.04549873  0.07556217
-#> x                 -0.03456093 -0.14069964  0.07157779
-#> z                 -0.30304487 -0.32783188 -0.27825786
-#> sigma_y            0.44671820  0.43774174  0.45569466
-#> proxy_(Intercept) -1.10296624 -1.44774354 -0.75818894
-#> proxy_y           -2.70476237 -2.98282545 -2.42669929
-#> proxy_z            0.07240037 -0.07478795  0.21958868
-#> proxy_x            1.16985653  0.62473209  1.71498097
-#> truth_(Intercept)  0.19237950 -0.02869709  0.41345610
+#> (Intercept)        0.01473294 -0.04580470  0.07527058
+#> x                 -0.03398086 -0.14016176  0.07220005
+#> z                 -0.30307115 -0.32785746 -0.27828483
+#> sigma_y            0.44671582  0.43774672  0.45568492
+#> proxy_(Intercept) -1.10799676 -1.45359417 -0.76239935
+#> proxy_y           -2.70863891 -2.98847038 -2.42880744
+#> proxy_z            0.07220019 -0.07521581  0.21961619
+#> proxy_x            1.17814840  0.63208394  1.72421285
+#> truth_(Intercept)  0.19179051 -0.02916621  0.41274722
 #> 
 #> 
 #> Coefficients (Naive Estimator): 
@@ -145,8 +145,9 @@ summary(res)
 #> z           -0.32240014 -0.4192639 -0.2255364
 ```
 
-If you have information on the data generation processes of proxy and
-ground truth, you can overide the default.
+If you have knowledge on the data generation processes of proxy and
+ground truth, you can represent your knowledge as formulas and override
+the default.
 
 ``` r
 res2 <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_data,
@@ -154,21 +155,21 @@ res2 <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_da
                   truth_formula = x ~ z, truth_family = binomial())
 summary(res2)
 #> Coefficients (Corrected Estimator): 
-#>                      Estimate       2.5 %      97.5 %
-#> (Intercept)        0.00635533 -0.04988833  0.06259899
-#> x                 -0.01963326 -0.12373290  0.08446637
-#> z                 -0.30183593 -0.32787045 -0.27580140
-#> sigma_y            0.44691813  0.43809122  0.45574504
-#> proxy_(Intercept) -0.96020956 -1.33289921 -0.58751992
-#> proxy_x            1.04534794  0.36417084  1.72652504
-#> proxy_y           -2.15022321 -2.79430668 -1.50613974
-#> proxy_z           -0.38414373 -1.09178126  0.32349380
-#> proxy_x:y         -1.14373697 -2.50612613  0.21865219
-#> proxy_x:z          0.51474059 -0.57797887  1.60746004
-#> proxy_y:z         -0.87072794 -1.96159253  0.22013665
-#> proxy_x:y:z        1.47133983 -0.50016855  3.44284820
-#> truth_(Intercept)  0.05317137 -0.24481312  0.35115586
-#> truth_z            0.30103182 -0.14024477  0.74230842
+#>                       Estimate       2.5 %      97.5 %
+#> (Intercept)        0.005584836 -0.05027797  0.06144765
+#> x                 -0.018389867 -0.12189352  0.08511378
+#> z                 -0.301775544 -0.32774917 -0.27580191
+#> sigma_y            0.447018617  0.43819581  0.45584142
+#> proxy_(Intercept) -0.988852607 -1.37034327 -0.60736194
+#> proxy_x            1.096593104  0.40386907  1.78931714
+#> proxy_y           -2.214711717 -2.87073539 -1.55868804
+#> proxy_z           -0.288342120 -0.98922372  0.41253948
+#> proxy_x:y         -1.048165694 -2.41557066  0.31923927
+#> proxy_x:z          0.377055796 -0.72274424  1.47685583
+#> proxy_y:z         -0.671167058 -1.73800581  0.39567169
+#> proxy_x:y:z        1.171480989 -0.76065452  3.10361649
+#> truth_(Intercept)  0.049727393 -0.24759212  0.34704691
+#> truth_z            0.294389590 -0.14670467  0.73548385
 #> 
 #> 
 #> Coefficients (Naive Estimator): 
@@ -228,6 +229,36 @@ glm(y~x+z, data = val_data)
 #> Degrees of Freedom: 299 Total (i.e. Null);  297 Residual
 #> Null Deviance:       61.68 
 #> Residual Deviance: 53.79     AIC: 343.8
+```
+
+## Dependent variable
+
+The same method can also be applied to regression analysis where the
+dependent variable is a proxy.
+
+``` r
+head(research_data2)
+#>   w x z
+#> 1 0 0 0
+#> 2 0 0 1
+#> 3 1 1 1
+#> 4 1 1 0
+#> 5 1 1 0
+#> 6 0 1 0
+```
+
+``` r
+res3 <- glm_fixit(formula = y || w ~ x + z, data = research_data2, data2 = val_data2, family = binomial("logit"))
+res3
+#> Corrected Estimator:
+#> (Intercept)           x           z 
+#> -0.05902577  0.06280805 -0.30843225 
+#> Feasible Estimator:
+#> (Intercept)           x           z 
+#> -0.05023838  0.14891833 -0.31366643 
+#> Naive Estimator:
+#> (Intercept)           x           z 
+#> -0.07540977 -0.40103564 -0.13383571
 ```
 
 ## References

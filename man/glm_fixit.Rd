@@ -52,4 +52,9 @@ glm_fixit(y ~ x || w + z, data = research_data, data2 = val_data)
 ## a more accurate correction
 glm_fixit(y ~ x || w + z, data = research_data, data2 = val_data,
 proxy_formula = w ~ x*w*z, truth_formula = x ~ w)
+## proxy variable in the outcome
+glm_fixit(y || w ~ x + z, data = research_data2, data2 = val_data2)
+}
+\seealso{
+\link{research_data}
 }

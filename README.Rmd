@@ -48,23 +48,23 @@ Yes: ["Validate, validate, validate."](https://web.stanford.edu/~jgrimmer/tad2.p
 
 ## Our approach
 
-The function `glm_fixit()` does regression analysis but also corrects for misclassification in proxy using the information in validation data. The method is based on the general likelihood modeling framework drawn from Carroll et al. (2006). The function is very similar to `glm()` but with two changes:
+The function `glm_fixit()` does regression analysis but also corrects for misclassification in proxy using the validation data. The method is based on the general likelihood modeling framework drawn from Carroll et al. (2006). The function is very similar to `glm()` but with two changes:
 
 1. The formula interface has been extended with the double-pipe operator to denote proxy variable. For example, `x || w` indicates `w` is the proxy of the ground truth `x`.
 2. The validation data (with both proxy and ground truth, as well as another variables, e.g. `y` and `z`) must be provided as `data2`
 
-```{r}
+```{r fixit1est}
 res <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_data)
 res
 ```
 
-```{r}
+```{r fixit1summ}
 summary(res)
 ```
 
-If you have information on the data generation processes of proxy and ground truth, you can overide the default.
+If you have knowledge on the data generation processes of proxy and ground truth, you can represent your knowledge as formulas and override the default.
 
-```{r}
+```{r fixit1est2}
 res2 <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_data,
                   proxy_formula = w ~ x*y*z, proxy_family = binomial(),
                   truth_formula = x ~ z, truth_family = binomial())
@@ -85,8 +85,21 @@ The "naive" estimator suggests the regression coefficient to be -.4 [^1], which 
 
 One can also analyze the validation data only. This approach gives unbiased but imprecise estimates.
 
-```{r}
+```{r feasible}
 glm(y~x+z, data = val_data)
+```
+
+## Dependent variable
+
+The same method can also be applied to regression analysis where the dependent variable is a proxy.
+
+```{r researchdata2}
+head(research_data2)
+```
+
+```{r fixit2}
+res3 <- glm_fixit(formula = y || w ~ x + z, data = research_data2, data2 = val_data2, family = binomial("logit"))
+res3
 ```
 
 ## References

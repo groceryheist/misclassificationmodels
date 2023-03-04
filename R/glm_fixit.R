@@ -175,6 +175,7 @@
 #' @param maxit variable get passed to [optim()]
 #' @param method variable get passed to [optim()]
 #' @return This function returns an object class "glm_fixit"
+#' @seealso [research_data]
 #' @examples
 #' ## Confusion matrix
 #' table(val_data$w, val_data$x)
@@ -183,10 +184,12 @@
 #' ## a more accurate correction
 #' glm_fixit(y ~ x || w + z, data = research_data, data2 = val_data,
 #' proxy_formula = w ~ x*w*z, truth_formula = x ~ w)
+#' ## proxy variable in the outcome
+#' glm_fixit(y || w ~ x + z, data = research_data2, data2 = val_data2)
 #' @importFrom stats binomial coef confint dnorm gaussian glm model.frame model.matrix optim plogis qnorm rnorm
 #' @export
 glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_formula = NULL, proxy_family=binomial(link='logit'), truth_formula = NULL, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
-    df <- dplyr::bind_rows(data, data2)
+    df <- vctrs::vec_rbind(data, data2)
     parsed_formula <- .conv_formula(formula)
     if (is.null(proxy_formula)) {
         proxy_formula <- formula(paste0(parsed_formula$proxy, "~."))
@@ -195,10 +198,11 @@ glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_formula =
         truth_formula <- formula(paste0(parsed_formula$truth, "~ 1"))
     }
     if(isFALSE(parsed_formula$yproxy)) {
-        res <- .measerr_mle_iv(df, outcome_formula = formula(parsed_formula$outcome_formula), outcome_family = family, proxy_formula = proxy_formula, truth_formula = truth_formula, maxit = maxit, method = method)
+        mla_function <- .measerr_mle_iv
     } else {
-        stop("Implementing")
+        mla_function <- .measerr_mle_dv        
     }
+    res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula), outcome_family = family, proxy_formula = proxy_formula, truth_formula = truth_formula, truth_family = truth_family, maxit = maxit, method = method)
     naive <- glm(formula = formula(parsed_formula$naive_formula), family = family, data = data)
     feasible <- glm(formula = formula(parsed_formula$outcome_formula), family = family, data = data2)
     res$naive <- naive
@@ -256,7 +260,7 @@ confint.glm_fixit <- function(object, parm, level = 0.95, ...) {
     args <- list(...)
     if ("which_model" %in% names(args)) {
         if (!args$which_model %in% c("corrected", "feasible", "naive")) {
-        stop("Unknown `which` value. Accepted values are \"corrected\", \"feasible\", \"naive\".")
+            stop("Unknown `which` value. Accepted values are \"corrected\", \"feasible\", \"naive\".")
         } else {
             which_model <- args$which_model
         }
@@ -307,8 +311,16 @@ summary.glm_fixit <- function(object, ...) {
 
 #' Simulated data for demonstration
 #'
-#' "research_data" and "val_data" are two datasets for demonstrating this package. Both datasets were generated with the expected regression cofficient for `x` being -0.04. The ground truth variable "x" is predicted by the proxy variable "y" with only 60% accuracy.
+#' "research_data", "val_data", "research_data2", and "val_data2" are two datasets for demonstration.
+#' For "research_data" and "val_data", they were generated with the expected regression cofficient for `x` being -0.04. `w` is a proxy variable of `x` from an automated classifier with 60% accuracy.
+#' For "research_data2" and "val_data2", they were generated with the expected regression coefficient for `x` being 0. `w` is a proxy variable of `y` from an automated classifier with 80% accuracy.
 "research_data"
 
 #' @rdname research_data
 "val_data"
+
+#' @rdname research_data
+"val_data2"
+
+#' @rdname research_data
+"research_data2"

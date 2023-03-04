@@ -4,18 +4,30 @@
 \name{research_data}
 \alias{research_data}
 \alias{val_data}
+\alias{val_data2}
+\alias{research_data2}
 \title{Simulated data for demonstration}
 \format{
 An object of class \code{data.frame} with 4700 rows and 3 columns.
 
 An object of class \code{data.frame} with 300 rows and 4 columns.
+
+An object of class \code{data.frame} with 500 rows and 4 columns.
+
+An object of class \code{data.frame} with 6500 rows and 3 columns.
 }
 \usage{
 research_data
 
 val_data
+
+val_data2
+
+research_data2
 }
 \description{
-"research_data" and "val_data" are two datasets for demonstrating this package. Both datasets were generated with the expected regression cofficient for \code{x} being -0.04. The ground truth variable "x" is predicted by the proxy variable "y" with only 60\% accuracy.
+"research_data", "val_data", "research_data2", and "val_data2" are two datasets for demonstration.
+For "research_data" and "val_data", they were generated with the expected regression cofficient for \code{x} being -0.04. \code{w} is a proxy variable of \code{x} from an automated classifier with 60\% accuracy.
+For "research_data2" and "val_data2", they were generated with the expected regression coefficient for \code{x} being 0. \code{w} is a proxy variable of \code{y} from an automated classifier with 80\% accuracy.
 }
 \keyword{datasets}
