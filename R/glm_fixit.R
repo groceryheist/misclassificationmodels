@@ -107,7 +107,7 @@
 }
 
 
-.measerr_mle <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
+.measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
     outcome.params <- colnames(model.matrix(outcome_formula,df))
     lower <- rep(-Inf, length(outcome.params))
     if (outcome_family$family == 'gaussian') {
@@ -146,7 +146,11 @@
         res$outcome_formula <- paste(c(tokenized_formula[[2]], "~", tokenized_formula[[3]][setdiff(seq_along(tokenized_formula[[3]]), c(sign_idx, sign_idx + 1))]), collapse = " ")
         res$naive_formula <- paste(c(tokenized_formula[[2]], "~", tokenized_formula[[3]][setdiff(seq_along(tokenized_formula[[3]]), c(sign_idx, sign_idx - 1))]), collapse = " ")
     } else {
-        stop("Not implemented yet")
+        sign_idx <- which(tokenized_formula[[2]] == "||")
+        res$truth <- tokenized_formula[[2]][sign_idx - 1]
+        res$proxy <- tokenized_formula[[2]][sign_idx + 1]
+        res$outcome_formula <- paste(c(res$truth, "~", tokenized_formula[[3]]), collapse = " ")
+        res$naive_formula <- paste(c(res$proxy, "~", tokenized_formula[[3]]), collapse = " ")
     }
     return(res)
 }
@@ -190,7 +194,11 @@ glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_formula =
     if (is.null(truth_formula)) {
         truth_formula <- formula(paste0(parsed_formula$truth, "~ 1"))
     }
-    res <- .measerr_mle(df, outcome_formula = formula(parsed_formula$outcome_formula), outcome_family = family, proxy_formula = proxy_formula, truth_formula = truth_formula, maxit = maxit, method = method)
+    if(isFALSE(parsed_formula$yproxy)) {
+        res <- .measerr_mle_iv(df, outcome_formula = formula(parsed_formula$outcome_formula), outcome_family = family, proxy_formula = proxy_formula, truth_formula = truth_formula, maxit = maxit, method = method)
+    } else {
+        stop("Implementing")
+    }
     naive <- glm(formula = formula(parsed_formula$naive_formula), family = family, data = data)
     feasible <- glm(formula = formula(parsed_formula$outcome_formula), family = family, data = data2)
     res$naive <- naive
@@ -244,6 +252,7 @@ coef.glm_fixit <- function(object, ...) {
 #' @method confint glm_fixit
 #' @export
 confint.glm_fixit <- function(object, parm, level = 0.95, ...) {
+    ## ask the base people why "parm" is used here ?confint
     args <- list(...)
     if ("which_model" %in% names(args)) {
         if (!args$which_model %in% c("corrected", "feasible", "naive")) {
@@ -295,7 +304,6 @@ summary.glm_fixit <- function(object, ...) {
     colnames(feasible_table)[1] <- "Estimate"
     print(feasible_table)    
 }
-
 
 #' Simulated data for demonstration
 #'
