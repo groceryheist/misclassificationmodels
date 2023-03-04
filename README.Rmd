@@ -98,7 +98,8 @@ head(research_data2)
 ```
 
 ```{r fixit2}
-res3 <- glm_fixit(formula = y || w ~ x + z, data = research_data2, data2 = val_data2, family = binomial("logit"))
+res3 <- glm_fixit(formula = y || w ~ x + z, data = research_data2,
+                  data2 = val_data2, family = binomial("logit"))
 res3
 ```
 
