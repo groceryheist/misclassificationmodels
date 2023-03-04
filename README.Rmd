@@ -48,7 +48,7 @@ Yes: ["Validate, validate, validate."](https://web.stanford.edu/~jgrimmer/tad2.p
 
 ## Our approach
 
-The function `glm_fixit()` does regression analysis but also corrects for misclassification in proxy using the information in validation data. The method is based on the general likelihood modeling framework drawn from Carroll et al. (2006). The function is very simular to `glm()` but with two changes:
+The function `glm_fixit()` does regression analysis but also corrects for misclassification in proxy using the information in validation data. The method is based on the general likelihood modeling framework drawn from Carroll et al. (2006). The function is very similar to `glm()` but with two changes:
 
 1. The formula interface has been extended with the double-pipe operator to denote proxy variable. For example, `x || w` indicates `w` is the proxy of the ground truth `x`.
 2. The validation data (with both proxy and ground truth, as well as another variables, e.g. `y` and `z`) must be provided as `data2`

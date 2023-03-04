@@ -20,12 +20,12 @@ This package provides an example dataset (5000 observations)
 library(misclassificationmodels)
 head(research_data)
 #>             y z w
-#> 1 -0.38203402 0 1
-#> 2 -0.58550439 1 1
-#> 3  0.10200748 1 0
-#> 4 -0.03910045 0 0
-#> 5 -0.42903323 1 1
-#> 6 -0.28247858 0 1
+#> 1 -0.33569058 0 1
+#> 2 -0.54095121 1 1
+#> 3  0.13380991 1 0
+#> 4 -0.03837528 0 0
+#> 5 -0.38738200 1 1
+#> 6 -0.23798152 0 1
 ```
 
 Suppose we are interested in the relationship between `y` and `x`. `x`
@@ -39,12 +39,12 @@ observations).
 ``` r
 head(val_data)
 #>   x          y z w
-#> 1 1 -0.2722558 1 1
-#> 2 0 -0.1934921 0 1
-#> 3 0  0.4066484 0 0
-#> 4 1  0.2695641 0 0
-#> 5 1 -0.3636303 1 1
-#> 6 0 -0.2322365 0 1
+#> 1 1 -0.2335122 1 1
+#> 2 0 -0.1899035 0 1
+#> 3 0  0.3991066 0 0
+#> 4 1  0.3038228 0 0
+#> 5 1 -0.3231921 1 1
+#> 6 0 -0.2279294 0 1
 ```
 
 In this dataset, we have the misclassified variable `w` and the variable
@@ -59,25 +59,25 @@ caret::confusionMatrix(table(w = val_data$w, x = val_data$x), mode = "prec_recal
 #> 
 #>    x
 #> w     0   1
-#>   0  82  63
-#>   1  51 104
+#>   0  82  62
+#>   1  51 105
 #>                                           
-#>                Accuracy : 0.62            
-#>                  95% CI : (0.5624, 0.6752)
+#>                Accuracy : 0.6233          
+#>                  95% CI : (0.5658, 0.6784)
 #>     No Information Rate : 0.5567          
-#>     P-Value [Acc > NIR] : 0.01537         
+#>     P-Value [Acc > NIR] : 0.01136         
 #>                                           
-#>                   Kappa : 0.2371          
+#>                   Kappa : 0.2432          
 #>                                           
-#>  Mcnemar's Test P-Value : 0.30290         
+#>  Mcnemar's Test P-Value : 0.34685         
 #>                                           
-#>               Precision : 0.6710          
-#>                  Recall : 0.6228          
-#>                      F1 : 0.6460          
+#>               Precision : 0.6731          
+#>                  Recall : 0.6287          
+#>                      F1 : 0.6502          
 #>              Prevalence : 0.5567          
-#>          Detection Rate : 0.3467          
-#>    Detection Prevalence : 0.5167          
-#>       Balanced Accuracy : 0.6196          
+#>          Detection Rate : 0.3500          
+#>    Detection Prevalence : 0.5200          
+#>       Balanced Accuracy : 0.6226          
 #>                                           
 #>        'Positive' Class : 1               
 #> 
@@ -91,7 +91,7 @@ validate.”](https://web.stanford.edu/~jgrimmer/tad2.pdf)
 The function `glm_fixit()` does regression analysis but also corrects
 for misclassification in proxy using the information in validation data.
 The method is based on the general likelihood modeling framework drawn
-from Carroll et al. (2006). The function is very simular to `glm()` but
+from Carroll et al. (2006). The function is very similar to `glm()` but
 with two changes:
 
 1.  The formula interface has been extended with the double-pipe
@@ -107,42 +107,42 @@ res <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_dat
 res
 #> Corrected Estimator:
 #> (Intercept)           x           z 
-#>  0.01820867 -0.07688855 -0.30603316 
+#>  0.01503172 -0.03456093 -0.30304487 
 #> Feasible Estimator:
 #> (Intercept)           x           z 
-#>  0.03274267 -0.06740639 -0.32282343 
+#>  0.03213542 -0.02689811 -0.32240014 
 #> Naive Estimator:
 #> (Intercept)           w           z 
-#>   0.1518150  -0.4246592  -0.2366182
+#>   0.1646739  -0.4094128  -0.2340211
 ```
 
 ``` r
 summary(res)
 #> Coefficients (Corrected Estimator): 
 #>                      Estimate       2.5 %      97.5 %
-#> (Intercept)        0.01820867 -0.04327340  0.07969073
-#> x                 -0.07688855 -0.18390190  0.03012480
-#> z                 -0.30603316 -0.33133190 -0.28073443
-#> sigma_y            0.45475431  0.44483618  0.46467244
-#> proxy_(Intercept) -1.06443964 -1.40485575 -0.72402354
-#> proxy_y           -2.63902564 -2.88201828 -2.39603299
-#> proxy_z            0.05370348 -0.09069282  0.19809979
-#> proxy_x            1.02270589  0.48246000  1.56295178
-#> truth_(Intercept)  0.20134684 -0.02070900  0.42340268
+#> (Intercept)        0.01503172 -0.04549873  0.07556217
+#> x                 -0.03456093 -0.14069964  0.07157779
+#> z                 -0.30304487 -0.32783188 -0.27825786
+#> sigma_y            0.44671820  0.43774174  0.45569466
+#> proxy_(Intercept) -1.10296624 -1.44774354 -0.75818894
+#> proxy_y           -2.70476237 -2.98282545 -2.42669929
+#> proxy_z            0.07240037 -0.07478795  0.21958868
+#> proxy_x            1.16985653  0.62473209  1.71498097
+#> truth_(Intercept)  0.19237950 -0.02869709  0.41345610
 #> 
 #> 
 #> Coefficients (Naive Estimator): 
 #>               Estimate      2.5 %     97.5 %
-#> (Intercept)  0.1518150  0.1326380  0.1709919
-#> w           -0.4246592 -0.4482473 -0.4010712
-#> z           -0.2366182 -0.2602060 -0.2130304
+#> (Intercept)  0.1646739  0.1458282  0.1835196
+#> w           -0.4094128 -0.4326380 -0.3861877
+#> z           -0.2340211 -0.2572460 -0.2107961
 #> 
 #> 
 #> Coefficients (Feasible Estimator): 
-#>                Estimate       2.5 %      97.5 %
-#> (Intercept)  0.03274267 -0.05186194  0.11734728
-#> x           -0.06740639 -0.16642217  0.03160938
-#> z           -0.32282343 -0.42151757 -0.22412928
+#>                Estimate      2.5 %     97.5 %
+#> (Intercept)  0.03213542 -0.0509001  0.1151709
+#> x           -0.02689811 -0.1240775  0.0702813
+#> z           -0.32240014 -0.4192639 -0.2255364
 ```
 
 If you have information on the data generation processes of proxy and
@@ -154,35 +154,35 @@ res2 <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_da
                   truth_formula = x ~ z, truth_family = binomial())
 summary(res2)
 #> Coefficients (Corrected Estimator): 
-#>                       Estimate      2.5 %      97.5 %
-#> (Intercept)        0.003416043 -0.0538049  0.06063698
-#> x                 -0.053183012 -0.1587901  0.05242403
-#> z                 -0.302314297 -0.3294259 -0.27520272
-#> sigma_y            0.455559075  0.4461590  0.46495920
-#> proxy_(Intercept) -0.962707699 -1.3321562 -0.59325923
-#> proxy_x            0.946832241  0.2681144  1.62555007
-#> proxy_y           -2.106621379 -2.7571816 -1.45606120
-#> proxy_z           -0.335358234 -1.0372244  0.36650795
-#> proxy_x:y         -1.147796409 -2.6035123  0.30791945
-#> proxy_x:z          0.439663253 -0.6632072  1.54253371
-#> proxy_y:z         -0.729543473 -1.8278959  0.36880895
-#> proxy_x:y:z        1.266049189 -0.7992589  3.33135728
-#> truth_(Intercept)  0.053447292 -0.2449874  0.35188194
-#> truth_z            0.312339089 -0.1302410  0.75491914
+#>                      Estimate       2.5 %      97.5 %
+#> (Intercept)        0.00635533 -0.04988833  0.06259899
+#> x                 -0.01963326 -0.12373290  0.08446637
+#> z                 -0.30183593 -0.32787045 -0.27580140
+#> sigma_y            0.44691813  0.43809122  0.45574504
+#> proxy_(Intercept) -0.96020956 -1.33289921 -0.58751992
+#> proxy_x            1.04534794  0.36417084  1.72652504
+#> proxy_y           -2.15022321 -2.79430668 -1.50613974
+#> proxy_z           -0.38414373 -1.09178126  0.32349380
+#> proxy_x:y         -1.14373697 -2.50612613  0.21865219
+#> proxy_x:z          0.51474059 -0.57797887  1.60746004
+#> proxy_y:z         -0.87072794 -1.96159253  0.22013665
+#> proxy_x:y:z        1.47133983 -0.50016855  3.44284820
+#> truth_(Intercept)  0.05317137 -0.24481312  0.35115586
+#> truth_z            0.30103182 -0.14024477  0.74230842
 #> 
 #> 
 #> Coefficients (Naive Estimator): 
 #>               Estimate      2.5 %     97.5 %
-#> (Intercept)  0.1518150  0.1326380  0.1709919
-#> w           -0.4246592 -0.4482473 -0.4010712
-#> z           -0.2366182 -0.2602060 -0.2130304
+#> (Intercept)  0.1646739  0.1458282  0.1835196
+#> w           -0.4094128 -0.4326380 -0.3861877
+#> z           -0.2340211 -0.2572460 -0.2107961
 #> 
 #> 
 #> Coefficients (Feasible Estimator): 
-#>                Estimate       2.5 %      97.5 %
-#> (Intercept)  0.03274267 -0.05186194  0.11734728
-#> x           -0.06740639 -0.16642217  0.03160938
-#> z           -0.32282343 -0.42151757 -0.22412928
+#>                Estimate      2.5 %     97.5 %
+#> (Intercept)  0.03213542 -0.0509001  0.1151709
+#> x           -0.02689811 -0.1240775  0.0702813
+#> z           -0.32240014 -0.4192639 -0.2255364
 ```
 
 ## What is “Naive Estimator”?
@@ -198,11 +198,11 @@ glm(y~w+z, data = research_data)
 #> 
 #> Coefficients:
 #> (Intercept)            w            z  
-#>      0.1518      -0.4247      -0.2366  
+#>      0.1647      -0.4094      -0.2340  
 #> 
 #> Degrees of Freedom: 4699 Total (i.e. Null);  4697 Residual
-#> Null Deviance:       1094 
-#> Residual Deviance: 778.7     AIC: 4897
+#> Null Deviance:       1052 
+#> Residual Deviance: 753.7     AIC: 4744
 ```
 
 The “naive” estimator suggests the regression coefficient to be -.4
@@ -223,11 +223,11 @@ glm(y~x+z, data = val_data)
 #> 
 #> Coefficients:
 #> (Intercept)            x            z  
-#>     0.03274     -0.06741     -0.32282  
+#>     0.03214     -0.02690     -0.32240  
 #> 
 #> Degrees of Freedom: 299 Total (i.e. Null);  297 Residual
-#> Null Deviance:       64.17 
-#> Residual Deviance: 55.85     AIC: 355
+#> Null Deviance:       61.68 
+#> Residual Deviance: 53.79     AIC: 343.8
 ```
 
 ## References
