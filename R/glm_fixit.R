@@ -166,7 +166,7 @@
 #' This function provides the MLE-based misclassification correction method proposed by Carroll.
 #' @param formula an object of class "formula". Please refer to [formula] for details. This package extends the formula syntax with the "||" symbol to indicate ground truth and proxy variables. For example, "x||w" indicates "w" is a proxy variable of the ground truth variable "x".  
 #' @param family a description of the error distribution and link function to be used in the model. Currently, this function supports [gaussian()] and [binomial()].
-#' @param data a data frame with the actual data
+#' @param data a data frame with the primary data
 #' @param data2 a data frame with the validation data
 #' @param proxy_formula an object of class "formula" to describe the data generating process of the proxy variable. Default to all columns in `data2`, i.e. "w ~ ."
 #' @param proxy_family a description of the error distribution and link function to be used to model the proxy variable. Currently, this function supports [gaussian()] and [binomial()].
