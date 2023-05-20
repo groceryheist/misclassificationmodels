@@ -308,19 +308,3 @@ summary.glm_fixit <- function(object, ...) {
     colnames(feasible_table)[1] <- "Estimate"
     print(feasible_table)    
 }
-
-#' Simulated data for demonstration
-#'
-#' "research_data", "val_data", "research_data2", and "val_data2" are two datasets for demonstration.
-#' For "research_data" and "val_data", they were generated with the expected regression cofficient for `x` being -0.04. `w` is a proxy variable of `x` from an automated classifier with 60% accuracy.
-#' For "research_data2" and "val_data2", they were generated with the expected regression coefficient for `x` being 0. `w` is a proxy variable of `y` from an automated classifier with 80% accuracy.
-"research_data"
-
-#' @rdname research_data
-"val_data"
-
-#' @rdname research_data
-"val_data2"
-
-#' @rdname research_data
-"research_data2"
