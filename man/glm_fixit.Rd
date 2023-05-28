@@ -22,7 +22,7 @@ glm_fixit(
 
 \item{family}{a description of the error distribution and link function to be used in the model. Currently, this function supports \code{\link[=gaussian]{gaussian()}} and \code{\link[=binomial]{binomial()}}.}
 
-\item{data}{a data frame with the actual data}
+\item{data}{a data frame with the primary data}
 
 \item{data2}{a data frame with the validation data}
 
