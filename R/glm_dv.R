@@ -1,5 +1,3 @@
-source("likelihoods.R")
-
 .nll_dv <- function(params, df, outcome_formula, outcome_family = gaussian(), proxy_formula,
                     proxy_family = binomial(link='logit'), truth_formula,
                     truth_family = binomial(link='logit')) {
@@ -14,19 +12,19 @@ source("likelihoods.R")
     outcome.params <- params[param.idx:n.outcome.model.covars]
     param.idx <- param.idx + n.outcome.model.covars
 
-    if((outcome_family$family == "binomial") && (outcome_family$link == 'logit')){
+    if ((outcome_family$family == "binomial") && (outcome_family$link == 'logit')) {
         outcome.llfun <- ll.logistic
-    } else {
-        print("Only logistic regression is supported")
-        return()
-    }
+    }##  else {
+    ##     print("Only logistic regression is supported")
+    ##     return()
+    ## }
 
-    if( (proxy_family$family=="binomial") && (proxy_family$link=='logit')){
+    if( (proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
         proxy.llfun <- ll.logistic
-    } else {
-        print("Only logistic regression is supported. The proxy family should be binomial(link='logit').")
-        return()
-    }
+    }##  else {
+    ##     print("Only logistic regression is supported. The proxy family should be binomial(link='logit').")
+    ##     return()
+    ## }
 
     ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
 
