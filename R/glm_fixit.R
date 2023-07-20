@@ -1,5 +1,3 @@
-source(likelihoods.R)
-
 .measrr_mle_nll <- function(params, df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit')) {
     df.obs <- model.frame(outcome_formula, df)
     
@@ -17,24 +15,18 @@ source(likelihoods.R)
     param.idx <- param.idx + n.outcome.model.covars + 1
 
     ## likelihood for the fully observed data 
-    if(outcome_family$family == "gaussian") 
+    if (outcome_family$family == "gaussian") {
         outcome.llfun <- ll.gaussian
-
-    if((outcome_family$family == "binomial") && (outcome_family$link == "logit"))
+    }
+    if ((outcome_family$family == "binomial") && (outcome_family$link == "logit")) {
         outcome.llfun <- ll.logistic
-
-    if( (proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
+    }
+    if ((proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
         proxy.llfun <- ll.logistic
-    } else {
-        print("only binary binaries are supported. proxy_family should be binomial(link='logit')")
     }
-
-    if( (truth_family$family=="binomial") && (truth_family$link=='logit')) {
+    if ((truth_family$family=="binomial") && (truth_family$link=='logit')) {
         truth.llfun <- ll.logistic
-    } else {
-        print("only binary variables are supported. truth_family should be binomial(link='logit')")
-    }
-        
+    }   
     ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
     
     df.obs <- model.frame(proxy_formula,df)
@@ -152,9 +144,9 @@ source(likelihoods.R)
 #' @param data a data frame with the primary data
 #' @param data2 a data frame with the validation data
 #' @param proxy_formula an object of class "formula" to describe the data generating process of the proxy variable. Default to all columns in `data2`, i.e. "w ~ ."
-#' @param proxy_family a description of the error distribution and link function to be used to model the proxy variable. Currently, this function supports [gaussian()] and [binomial()].
+#' @param proxy_family a description of the error distribution and link function to be used to model the proxy variable. Currently, this function supports [binomial()].
 #' @param truth_formula an object of class "formula" to describe the data generating process of the ground truth variable. Default to an intercept only model (we don't know the data generating process), i.e. "x ~ 1"
-#' @param truth_family a description of the error distribution and link function to be used to model the ground truth variable. Currently, this function supports [gaussian()] and [binomial()].
+#' @param truth_family a description of the error distribution and link function to be used to model the ground truth variable. Currently, this function supports and [binomial()].
 #' @param maxit variable get passed to [optim()]
 #' @param method variable get passed to [optim()]
 #' @return This function returns an object class "glm_fixit"
@@ -172,8 +164,17 @@ source(likelihoods.R)
 #' @importFrom stats binomial coef confint dnorm gaussian glm model.frame model.matrix optim plogis qnorm rnorm
 #' @export
 glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_formula = NULL, proxy_family=binomial(link='logit'), truth_formula = NULL, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
-    df <- vctrs::vec_rbind(data, data2)
+    if ((proxy_family$family != "binomial") && (proxy_family$link != 'logit')) {
+        stop("Unsupported `proxy_family`. The proxy family should be binomial(link='logit').", call. = FALSE)
+    }
+    if ((truth_family$family != "binomial") && (truth_family$link != 'logit')) {
+        stop("Unsupported `truth_family`. The truth family should be binomial(link='logit').", call. = FALSE)
+    }
     parsed_formula <- .conv_formula(formula)
+    if (isTRUE(parsed_formula$yproxy) && family$family != "binomial" && family$link != "logit") {
+        stop("Only logistic regression is supported for dependent variable with misclassification.", call. = FALSE)
+    }
+    df <- vctrs::vec_rbind(data, data2)
     if (is.null(proxy_formula)) {
         proxy_formula <- formula(paste0(parsed_formula$proxy, "~."))
     }

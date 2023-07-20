@@ -28,11 +28,11 @@ glm_fixit(
 
 \item{proxy_formula}{an object of class "formula" to describe the data generating process of the proxy variable. Default to all columns in \code{data2}, i.e. "w ~ ."}
 
-\item{proxy_family}{a description of the error distribution and link function to be used to model the proxy variable. Currently, this function supports \code{\link[=gaussian]{gaussian()}} and \code{\link[=binomial]{binomial()}}.}
+\item{proxy_family}{a description of the error distribution and link function to be used to model the proxy variable. Currently, this function supports \code{\link[=binomial]{binomial()}}.}
 
 \item{truth_formula}{an object of class "formula" to describe the data generating process of the ground truth variable. Default to an intercept only model (we don't know the data generating process), i.e. "x ~ 1"}
 
-\item{truth_family}{a description of the error distribution and link function to be used to model the ground truth variable. Currently, this function supports \code{\link[=gaussian]{gaussian()}} and \code{\link[=binomial]{binomial()}}.}
+\item{truth_family}{a description of the error distribution and link function to be used to model the ground truth variable. Currently, this function supports and \code{\link[=binomial]{binomial()}}.}
 
 \item{maxit}{variable get passed to \code{\link[=optim]{optim()}}}
 
