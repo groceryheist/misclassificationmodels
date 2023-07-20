@@ -7,20 +7,22 @@
     response.var <- all.vars(outcome_formula)[1]
     y.obs <- with(df.obs,eval(parse(text=response.var)))
     
-    outcome.model.matrix <- model.matrix(outcome_formula, df)
-
-    param.idx <- 1
-    n.outcome.model.covars <- dim(outcome.model.matrix)[2]
-    outcome.params <- params[param.idx:(n.outcome.model.covars + 1)]
-    param.idx <- param.idx + n.outcome.model.covars + 1
-
-    ## likelihood for the fully observed data 
     if (outcome_family$family == "gaussian") {
+        ## gaussian always has `sigma_y` added to `outcome.params`; shift the index by one
+        index_shift <- 1
         outcome.llfun <- ll.gaussian
     }
     if ((outcome_family$family == "binomial") && (outcome_family$link == "logit")) {
+        index_shift <- 0
         outcome.llfun <- ll.logistic
     }
+    param.idx <- 1
+    outcome.model.matrix <- model.matrix(outcome_formula, df)
+    ## likelihood for the fully observed data
+    n.outcome.model.covars <- dim(outcome.model.matrix)[2]
+    outcome.params <- params[param.idx:(n.outcome.model.covars + index_shift)]
+    param.idx <- param.idx + n.outcome.model.covars + index_shift
+
     if ((proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
         proxy.llfun <- ll.logistic
     }
@@ -31,7 +33,7 @@
     
     df.obs <- model.frame(proxy_formula,df)
     n.proxy.model.covars <- dim(proxy.model.matrix)[2]
-    proxy.params <- params[param.idx:(n.proxy.model.covars+param.idx-1)]
+    proxy.params <- params[param.idx:(n.proxy.model.covars+param.idx - 1)]
     param.idx <- param.idx + n.proxy.model.covars
     proxy.obs <- with(df.obs, eval(parse(text=proxy.variable)))
 
@@ -80,7 +82,6 @@
     ll.unobs <- sum(matrixStats::colLogSumExps(rbind(ll.x0, ll.x1)))
     return(-(ll.unobs + ll.obs))
 }
-
 
 .measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
     outcome.params <- colnames(model.matrix(outcome_formula,df))
@@ -146,7 +147,7 @@
 #' @param proxy_formula an object of class "formula" to describe the data generating process of the proxy variable. Default to all columns in `data2`, i.e. "w ~ ."
 #' @param proxy_family a description of the error distribution and link function to be used to model the proxy variable. Currently, this function supports [binomial()].
 #' @param truth_formula an object of class "formula" to describe the data generating process of the ground truth variable. Default to an intercept only model (we don't know the data generating process), i.e. "x ~ 1"
-#' @param truth_family a description of the error distribution and link function to be used to model the ground truth variable. Currently, this function supports and [binomial()].
+#' @param truth_family a description of the error distribution and link function to be used to model the ground truth variable. Currently, this function supports [binomial()].
 #' @param maxit variable get passed to [optim()]
 #' @param method variable get passed to [optim()]
 #' @return This function returns an object class "glm_fixit"
