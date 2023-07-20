@@ -12,11 +12,21 @@
     outcome.params <- params[param.idx:n.outcome.model.covars]
     param.idx <- param.idx + n.outcome.model.covars
 
-    if((outcome_family$family == "binomial") && (outcome_family$link == 'logit')) {
-        ll.y.obs <- vector(mode='numeric', length=length(y.obs))
-        ll.y.obs[y.obs==1] <- plogis(outcome.params %*% t(outcome.model.matrix[y.obs==1,]),log=TRUE)
-        ll.y.obs[y.obs==0] <- plogis(outcome.params %*% t(outcome.model.matrix[y.obs==0,]),log=TRUE,lower.tail=FALSE)
-    }
+    if ((outcome_family$family == "binomial") && (outcome_family$link == 'logit')) {
+        outcome.llfun <- ll.logistic
+    }##  else {
+    ##     print("Only logistic regression is supported")
+    ##     return()
+    ## }
+
+    if( (proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
+        proxy.llfun <- ll.logistic
+    }##  else {
+    ##     print("Only logistic regression is supported. The proxy family should be binomial(link='logit').")
+    ##     return()
+    ## }
+
+    ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
 
     df.obs <- model.frame(proxy_formula,df)
     n.proxy.model.covars <- dim(proxy.model.matrix)[2]
@@ -25,11 +35,7 @@
     param.idx <- param.idx + n.proxy.model.covars
     proxy.obs <- with(df.obs, eval(parse(text=proxy.variable)))
 
-    if( (proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
-        ll.w.obs <- vector(mode='numeric',length=dim(proxy.model.matrix)[1])
-        ll.w.obs[proxy.obs==1] <- plogis(proxy.params %*% t(proxy.model.matrix[proxy.obs==1,]),log=TRUE)
-        ll.w.obs[proxy.obs==0] <- plogis(proxy.params %*% t(proxy.model.matrix[proxy.obs==0,]),log=TRUE, lower.tail=FALSE)
-    }
+    ll.w.obs <- outcome.llfun(proxy.obs, proxy.params, proxy.model.matrix)
 
     ll.obs <- sum(ll.y.obs + ll.w.obs)
 
@@ -41,27 +47,17 @@
     
     ## integrate out y
     outcome.model.matrix.y1 <- model.matrix(outcome_formula, df.unobs.y1)
+    outcome.model.matrix.y0 <- model.matrix(outcome_formula, df.unobs.y0)
 
-    if((outcome_family$family == "binomial") && (outcome_family$link == 'logit')) {
-        ll.y.unobs.1 <- vector(mode='numeric', length=dim(outcome.model.matrix.y1)[1])
-        ll.y.unobs.0 <- vector(mode='numeric', length=dim(outcome.model.matrix.y1)[1])
-        ll.y.unobs.1 <- plogis(outcome.params %*% t(outcome.model.matrix.y1),log=TRUE)
-        ll.y.unobs.0 <- plogis(outcome.params %*% t(outcome.model.matrix.y1),log=TRUE,lower.tail=FALSE)
-    }
+    ll.y.unobs.1 <- outcome.llfun(df.unobs.y1[[response.var]], outcome.params, outcome.model.matrix.y1)
+    ll.y.unobs.0 <- outcome.llfun(df.unobs.y0[[response.var]], outcome.params, outcome.model.matrix.y0)
 
     proxy.model.matrix.y1 <- model.matrix(proxy_formula, df.unobs.y1)
     proxy.model.matrix.y0 <- model.matrix(proxy_formula, df.unobs.y0)
     proxy.unobs <- with(df.unobs, eval(parse(text=proxy.variable)))
 
-    if( (proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
-        ll.w.unobs.1 <- vector(mode='numeric',length=dim(proxy.model.matrix.y1)[1])
-        ll.w.unobs.0 <- vector(mode='numeric',length=dim(proxy.model.matrix.y0)[1])
-        ll.w.unobs.1[proxy.unobs==1] <- plogis(proxy.params %*% t(proxy.model.matrix.y1[proxy.unobs==1,]),log=TRUE)
-        ll.w.unobs.1[proxy.unobs==0] <- plogis(proxy.params %*% t(proxy.model.matrix.y1[proxy.unobs==0,]),log=TRUE, lower.tail=FALSE)
-
-        ll.w.unobs.0[proxy.unobs==1] <- plogis(proxy.params %*% t(proxy.model.matrix.y0[proxy.unobs==1,]),log=TRUE)
-        ll.w.unobs.0[proxy.unobs==0] <- plogis(proxy.params %*% t(proxy.model.matrix.y0[proxy.unobs==0,]),log=TRUE, lower.tail=FALSE)
-    }
+    ll.w.unobs.1 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.y1)
+    ll.w.unobs.0 <- proxy.llfun(proxy.unobs, proxy.params,  proxy.model.matrix.y0)
 
     ll.unobs.1 <- ll.y.unobs.1 + ll.w.unobs.1
     ll.unobs.0 <- ll.y.unobs.0 + ll.w.unobs.0
@@ -84,3 +80,4 @@
                  proxy_family = proxy_family, truth_formula = truth_formula, truth_family = truth_family)
     return(fit)
 }
+
