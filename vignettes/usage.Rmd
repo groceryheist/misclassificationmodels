@@ -1,0 +1,99 @@
+---
+title: "usage"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{usage}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This package provides an example dataset (5000 observations). Suppose we are interested in the relationship between `y` and `x`. `x` is not in this dataset, because it is perhaps expensive to collect. Instead, we have another variable `w`, which is from an automated classifier trained to predict `x`.
+
+```{r researchdata}
+library(misclassificationmodels)
+head(research_data)
+```
+
+The automated classifier misclassifies `x`. In order to find out the extent of misclassification, we produced another validation dataset `val_data` (300 observations).
+
+```{r valdata}
+head(val_data)
+```
+
+The variable `w` is a **proxy**, whereas `x` is the **ground truth** of the proxy. The confusion matrix:
+
+```{r confusion}
+table(proxy = val_data$x, groundtruth = val_data$w)
+```
+
+The naive estimator is based on the analysis of using the proxy as if it were the ground truth:
+
+```{r naive}
+library(MASS)
+glm(y ~ w + z, data = research_data)
+```
+
+The feasible estimator is based on the analysis of only the validation dataset, which is quite different from the naive estimator.
+
+```{r feasible}
+glm(y ~ x + z, data = val_data)
+```
+
+## Maximum Likelihood Adjustment
+
+Maximum Likelihood Adjustment (MLA) is based on the general likelihood modeling framework drawn from Carroll et al. (2006). The function is very similar to glm() but with two changes:
+
+* The formula interface has been extended with the double-pipe operator to denote proxy variable. For example, `x || w` indicates `w` is the proxy of the ground truth `x`.
+* The validation data (with both proxy and ground truth, as well as another variables, e.g. `y` and `z`) must be provided as `data2`
+
+```{r mla}
+res <- glm_fixit(formula = y ~ x || w + z, data = research_data, data2 = val_data)
+res
+```
+
+Using the `summary` method to get a comparison between the three estimators: naive, feasible, and MLA. The naive estimator is biased.
+
+```{r mla_output}
+summary(res)
+```
+
+## Outcome families
+
+Currently the method support two families of output: Gaussian (default) and binomial (a.k.a. logistic regression).
+
+```{r mla_logistic1}
+research_data_binary <- research_data
+median_y <- median(research_data_binary$y)
+research_data_binary$y <- research_data_binary$y > median_y
+
+val_data_binary <- val_data
+val_data_binary$y <- val_data_binary$y > median_y
+
+head(research_data_binary)
+```
+
+```{r mla_logistic2}
+res2 <- glm_fixit(formula = y ~ x || w + z, data = research_data_binary, data2 = val_data_binary, family = binomial("logit"))
+summary(res2)
+```
+
+## Dependent variable
+
+The same method can also be applied to regression analysis where the dependent variable is a proxy.
+
+```{r researchdata2}
+head(research_data2)
+```
+
+```{r fixit2}
+res3 <- glm_fixit(formula = y || w ~ x + z, data = research_data2,
+                  data2 = val_data2, family = binomial("logit"))
+summary(res3)
+```
