@@ -45,15 +45,15 @@ This function returns an object class "glm_fixit"
 This function provides the MLE-based misclassification correction method proposed by Carroll.
 }
 \examples{
+\donttest{
 ## Confusion matrix
 table(val_data$w, val_data$x)
 ## default
 glm_fixit(y ~ x || w + z, data = research_data, data2 = val_data)
-## a more accurate correction
-glm_fixit(y ~ x || w + z, data = research_data, data2 = val_data,
-proxy_formula = w ~ x*w*z, truth_formula = x ~ w)
 ## proxy variable in the outcome
-glm_fixit(y || w ~ x + z, data = research_data2, data2 = val_data2)
+glm_fixit(y || w ~ x + z, data = research_data2,
+data2 = val_data2, family = binomial("logit"))
+}
 }
 \seealso{
 \link{research_data}
