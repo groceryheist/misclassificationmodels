@@ -69,7 +69,7 @@ simulate_data_y <- function(N, m, B0 = 0, Bxy = .3, Bzy = -0.3, seed, prediction
 
 require(dplyr)
 require(data.table)
-df <- simulate_data(seed = 12121, Bxy = 0, N = 5000, m = 300, prediction_accuracy = .6)
+df <- simulate_data(seed = 12121, Bxy = 0, N = 5000, m = 300, prediction_accuracy = .7)
 df$x <- df$x.obs
 
 df %>% filter(is.na(x)) %>% select(-x, -x.obs, -w) %>% rename(w = `w_pred`) %>% as.data.frame -> research_data
