@@ -20,7 +20,7 @@ WIP
 You can install the development version of `misclassificationmodels` like so:
 
 ``` r
-remotes::install_github("chainsawriot/misclassificationmodels")
+remotes::install_github("groceryheist/misclassificationmodels")
 ```
 
 ## Example
