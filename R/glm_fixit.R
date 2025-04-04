@@ -1,6 +1,7 @@
 .measrr_mle_nll <- function(params, df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit')) {
     df.obs <- model.frame(outcome_formula, df)
     
+    # we'll have multiple proxy variables. So this part needs to go in a loop / function
     proxy.variable <- all.vars(proxy_formula)[1]
     proxy.model.matrix <- model.matrix(proxy_formula, df)
 
@@ -16,27 +17,37 @@
         index_shift <- 0
         outcome.llfun <- ll.logistic
     }
+    # keeps track of which parameters we've read so far. 
     param.idx <- 1
     outcome.model.matrix <- model.matrix(outcome_formula, df)
+
     ## likelihood for the fully observed data
     n.outcome.model.covars <- dim(outcome.model.matrix)[2]
     outcome.params <- params[param.idx:(n.outcome.model.covars + index_shift)]
+    # update param.idx since we've used the parameters in the outcome model 
     param.idx <- param.idx + n.outcome.model.covars + index_shift
 
+    # think about whether we needs.
     if ((proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
         proxy.llfun <- ll.logistic
     }
     if ((truth_family$family=="binomial") && (truth_family$link=='logit')) {
         truth.llfun <- ll.logistic
     }   
+    # gets the likelihood for the outcome model
     ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
     
     df.obs <- model.frame(proxy_formula,df)
     n.proxy.model.covars <- dim(proxy.model.matrix)[2]
+
+    # gets the parameters for a proxy model. This we'll need to do in the loop. 
     proxy.params <- params[param.idx:(n.proxy.model.covars+param.idx - 1)]
     param.idx <- param.idx + n.proxy.model.covars
+
+    # this gets the dataset for the observed data in a proxy model. (goes in loop)
     proxy.obs <- with(df.obs, eval(parse(text=proxy.variable)))
 
+    # this get the likelihood for the observed data in a proxy model.
     ll.w.obs <- proxy.llfun(proxy.obs, proxy.params, proxy.model.matrix)
 
     df.obs <- model.frame(truth_formula, df)
