@@ -94,52 +94,51 @@
     return(-(ll.unobs + ll.obs))
 }
 
-.measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
-    outcome.params <- colnames(model.matrix(outcome_formula,df))
-
-    lower <- rep(-Inf, length(outcome.params))
-    if (outcome_family$family == 'gaussian') {
-        outcome.params <- c(outcome.params, "sigma_y")
-        lower <- c(lower, 1/1e6)
-    }
-    params <- outcome.params
-    proxy.params <- colnames(model.matrix(proxy_formula, df))
-    params <- c(params, paste0('proxy_',proxy.params))
+.measerr_mle_iv <- function(df, outcome_formula, outcome_family = gaussian(), 
+                                  proxy_families, truth_families, 
+                                  maxit = 1e6, method = 'L-BFGS-B') {
+  outcome.params <- colnames(model.matrix(outcome_formula, df))
+  lower <- rep(-Inf, length(outcome.params))
+  if (outcome_family$family == 'gaussian') {
+    outcome.params <- c(outcome.params, "sigma_y")
+    lower <- c(lower, 1/1e6)
+  }
+  params <- outcome.params
+  
+  proxy_formulas <- conv_formula_updated(outcome_formula)
+  truth_formulas <- list()
+  
+  for (i in seq_along(proxy_formulas)) {
+    proxy.params <- colnames(model.matrix(proxy_formulas[[i]], df))
+    params <- c(params, paste0('proxy', i, '_', proxy.params))
     lower <- c(lower, rep(-Inf, length(proxy.params)))
-    truth.params <- colnames(model.matrix(truth_formula, df))
-    params <- c(params, paste0('truth_', truth.params))
+  }
+  
+  for (i in seq_along(truth_families)) {
+    truth.params <- colnames(model.matrix(truth_formulas[[i]], df))
+    params <- c(params, paste0('truth', i, '_', truth.params))
     lower <- c(lower, rep(-Inf, length(truth.params)))
-    start <- rnorm(length(params))
-    ##start <- rep(0.1, length(params))
-    names(start) <- params
-    fit <- optim(start, fn = .measrr_mle_nll, lower = lower, method = method, hessian = TRUE, control = list(maxit=maxit),
-                 df = df, outcome_formula = outcome_formula, outcome_family = outcome_family, proxy_formula = proxy_formula,
-                 proxy_family = proxy_family, truth_formula = truth_formula, truth_family = truth_family)
-    return(fit)
+  }
+  
+  start <- rnorm(length(params))
+  names(start) <- params
+  
+  fit <- optim(start, fn = .measrr_mle_nll, lower = lower, method = method, hessian = TRUE, 
+               control = list(maxit = maxit), df = df, outcome_formula = outcome_formula, 
+               outcome_family = outcome_family, proxy_formulas = proxy_formulas, 
+               proxy_families = proxy_families, truth_families = truth_families)
+  
+  return(fit)
 }
 
-##hacky
-
 .conv_formula <- function(formula) {
-    res <- list()
+  # split the formula
     tokenized_formula <- strsplit(as.character(formula), " ")
     stopifnot("||" %in% unlist(tokenized_formula))
-    stopifnot(sum(unlist(tokenized_formula) == "||") == 1)
-    res$yproxy <- "||" %in% tokenized_formula[[2]]
-    if (!res$yproxy) {
-        sign_idx <- which(tokenized_formula[[3]] == "||")
-        res$truth <- tokenized_formula[[3]][sign_idx - 1]
-        res$proxy <- tokenized_formula[[3]][sign_idx + 1]
-        res$outcome_formula <- paste(c(tokenized_formula[[2]], "~", tokenized_formula[[3]][setdiff(seq_along(tokenized_formula[[3]]), c(sign_idx, sign_idx + 1))]), collapse = " ")
-        res$naive_formula <- paste(c(tokenized_formula[[2]], "~", tokenized_formula[[3]][setdiff(seq_along(tokenized_formula[[3]]), c(sign_idx, sign_idx - 1))]), collapse = " ")
-    } else {
-        sign_idx <- which(tokenized_formula[[2]] == "||")
-        res$truth <- tokenized_formula[[2]][sign_idx - 1]
-        res$proxy <- tokenized_formula[[2]][sign_idx + 1]
-        res$outcome_formula <- paste(c(res$truth, "~", tokenized_formula[[3]]), collapse = " ")
-        res$naive_formula <- paste(c(res$proxy, "~", tokenized_formula[[3]]), collapse = " ")
-    }
-    return(res)
+  formula_parts <- strsplit(deparse(formula), "\\|\\|")[[1]]
+  formula_parts <- lapply(formula_parts, function(f) as.formula(trimws(f)))
+  names(formula_parts) <- sapply(formula_parts, function(f) as.character(f[[2]]))
+  return(formula_parts)
 }
 
 ## glm(formula, family = gaussian, data, weights, subset,
@@ -175,54 +174,51 @@
 #' }
 #' @importFrom stats binomial coef confint dnorm gaussian glm model.frame model.matrix optim plogis qnorm rnorm
 #' @export
-glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_formula = NULL, proxy_family=binomial(link='logit'), truth_formula = NULL, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
-    if ((proxy_family$family != "binomial") && (proxy_family$link != 'logit')) {
-        stop("Unsupported `proxy_family`. The proxy family should be binomial(link='logit').", call. = FALSE)
-    }
-    if ((truth_family$family != "binomial") && (truth_family$link != 'logit')) {
-        stop("Unsupported `truth_family`. The truth family should be binomial(link='logit').", call. = FALSE)
-    }
-    parsed_formula <- .conv_formula(formula)
-    if (isTRUE(parsed_formula$yproxy) && family$family != "binomial" && family$link != "logit") {
-        stop("Only logistic regression is supported for dependent variable with misclassification.", call. = FALSE)
-    }
-    df <- vctrs::vec_rbind(data, data2)
-    if (is.null(proxy_formula)) {
-        proxy_formula <- formula(paste0(parsed_formula$proxy, "~."))
-    }
-    if (is.null(truth_formula)) {
-        truth_formula <- formula(paste0(parsed_formula$truth, "~ 1"))
-    }
-    if(isFALSE(parsed_formula$yproxy)) {
-        mla_function <- .measerr_mle_iv
-    } else {
-        mla_function <- .measerr_mle_dv        
-    }
-    res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula), outcome_family = family, proxy_formula = proxy_formula, truth_formula = truth_formula, truth_family = truth_family, maxit = maxit, method = method)
-    naive <- glm(formula = formula(parsed_formula$naive_formula), family = family, data = data)
-    feasible <- glm(formula = formula(parsed_formula$outcome_formula), family = family, data = data2)
-    res$naive <- naive
-    res$feasible <- feasible
-    res$formula <- formula
-    res$family <- family
-    res$proxy_formula <- proxy_formula
-    res$proxy_family <- proxy_family
-    res$truth_formula <- truth_formula
-    res$truth_family <- truth_family
-    class(res) <- c("glm_fixit", class(res))
-    return(res)
+glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_family = binomial(link='logit'), truth_family = binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
+  if ((proxy_family$family != "binomial") && (proxy_family$link != 'logit')) {
+    stop("Unsupported `proxy_family`. The proxy family should be binomial(link='logit').", call. = FALSE)
+  }
+  if ((truth_family$family != "binomial") && (truth_family$link != 'logit')) {
+    stop("Unsupported `truth_family`. The truth family should be binomial(link='logit').", call. = FALSE)
+  }
+  parsed_formula <- .conv_formula(formula)
+  if (isTRUE(parsed_formula$yproxy) && family$family != "binomial" && family$link != "logit") {
+    stop("Only logistic regression is supported for dependent variable with misclassification.", call. = FALSE)
+  }
+  df <- vctrs::vec_rbind(data, data2)
+  
+  mla_function <- if (isFALSE(parsed_formula$yproxy)) .measerr_mle_iv else .measerr_mle_dv
+  
+  res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula), 
+                      outcome_family = family, 
+                      truth_family = truth_family, 
+                      maxit = maxit, 
+                      method = method)
+  
+  naive <- glm(formula = formula(parsed_formula$naive_formula), family = family, data = data)
+  feasible <- glm(formula = formula(parsed_formula$outcome_formula), family = family, data = data2)
+  
+  res$naive <- naive
+  res$feasible <- feasible
+  res$formula <- formula
+  res$family <- family
+  res$proxy_family <- proxy_family
+  res$truth_family <- truth_family
+  class(res) <- c("glm_fixit", class(res))
+  
+  return(res)
 }
 
 #' @method print glm_fixit
 #' @export
 print.glm_fixit <- function(x, ...) {
-    all_vars <- names(coef(x$feasible))
-    cat("Corrected Estimator:\n")
-    print(x$par[all_vars])
-    cat("Feasible Estimator:\n")
-    print(coef(x$feasible))
-    cat("Naive Estimator:\n")
-    print(coef(x$naive))
+  all_vars <- names(coef(x$feasible))
+  cat("Corrected Estimator:\n")
+  print(x$par[all_vars])
+  cat("Feasible Estimator:\n")
+  print(coef(x$feasible))
+  cat("Naive Estimator:\n")
+  print(coef(x$naive))
 }
 
 #' @method coef glm_fixit
