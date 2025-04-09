@@ -1,135 +1,126 @@
-.measrr_mle_nll <- function(params, df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit')) {
-    df.obs <- model.frame(outcome_formula, df)
-    
-    # we'll have multiple proxy variables. So this part needs to go in a loop / function
-    proxy.variable <- all.vars(proxy_formula)[1]
-    proxy.model.matrix <- model.matrix(proxy_formula, df)
-
-    response.var <- all.vars(outcome_formula)[1]
-    y.obs <- with(df.obs,eval(parse(text=response.var)))
-    
-    if (outcome_family$family == "gaussian") {
-        ## gaussian always has `sigma_y` added to `outcome.params`; shift the index by one
-        index_shift <- 1
-        outcome.llfun <- ll.gaussian
-    }
-    if ((outcome_family$family == "binomial") && (outcome_family$link == "logit")) {
-        index_shift <- 0
-        outcome.llfun <- ll.logistic
-    }
-    # keeps track of which parameters we've read so far. 
-    param.idx <- 1
-    outcome.model.matrix <- model.matrix(outcome_formula, df)
-
-    ## likelihood for the fully observed data
-    n.outcome.model.covars <- dim(outcome.model.matrix)[2]
-    outcome.params <- params[param.idx:(n.outcome.model.covars + index_shift)]
-    # update param.idx since we've used the parameters in the outcome model 
-    param.idx <- param.idx + n.outcome.model.covars + index_shift
-
-    # think about whether we needs.
-    if ((proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
-        proxy.llfun <- ll.logistic
-    }
-    if ((truth_family$family=="binomial") && (truth_family$link=='logit')) {
-        truth.llfun <- ll.logistic
-    }   
-    # gets the likelihood for the outcome model
-    ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
-    
-    df.obs <- model.frame(proxy_formula,df)
-    n.proxy.model.covars <- dim(proxy.model.matrix)[2]
-
-    # gets the parameters for a proxy model. This we'll need to do in the loop. 
-    proxy.params <- params[param.idx:(n.proxy.model.covars+param.idx - 1)]
-    param.idx <- param.idx + n.proxy.model.covars
-
-    # this gets the dataset for the observed data in a proxy model. (goes in loop)
-    proxy.obs <- with(df.obs, eval(parse(text=proxy.variable)))
-
-    # this get the likelihood for the observed data in a proxy model.
-    ll.w.obs <- proxy.llfun(proxy.obs, proxy.params, proxy.model.matrix)
-
-    df.obs <- model.frame(truth_formula, df)
-    truth.variable <- all.vars(truth_formula)[1]
-    truth.obs <- with(df.obs, eval(parse(text=truth.variable)))
-    truth.model.matrix <- model.matrix(truth_formula,df)
-    n.truth.model.covars <- dim(truth.model.matrix)[2]
-    
-    truth.params <- params[param.idx:(n.truth.model.covars + param.idx - 1)]
-    ll.x.obs <- truth.llfun(truth.obs, truth.params, truth.model.matrix)
-    ## add the three likelihoods
-    ll.obs <- sum(ll.y.obs + ll.w.obs + ll.x.obs)
-
-    ## likelihood for the predicted data
-    ## integrate out the "truth" variable. 
-    df.unobs <- df[is.na(df[[truth.variable]]),]
-    df.unobs.x1 <- df.unobs
-    df.unobs.x1[,truth.variable] <- 1
-    df.unobs.x0 <- df.unobs
-    df.unobs.x0[,truth.variable] <- 0
-    outcome.unobs <- with(df.unobs, eval(parse(text=response.var)))
-        
-    outcome.model.matrix.x0 <- model.matrix(outcome_formula, df.unobs.x0)
-    outcome.model.matrix.x1 <- model.matrix(outcome_formula, df.unobs.x1)
-
-    ll.y.x0 <- outcome.llfun(outcome.unobs, outcome.params, outcome.model.matrix.x0)
-    ll.y.x1 <- outcome.llfun(outcome.unobs, outcome.params, outcome.model.matrix.x1)
-
-    proxy.model.matrix.x0 <- model.matrix(proxy_formula, df.unobs.x0)
-    proxy.model.matrix.x1 <- model.matrix(proxy_formula, df.unobs.x1)
-    proxy.unobs <- df.unobs[[proxy.variable]]
-    ll.w.x0 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.x0)
-    ll.w.x1 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.x1)
-
-    truth.model.matrix <- model.matrix(truth_formula, df.unobs.x0)
-                                        # likelihood of truth
-    ll.x.x1 <- truth.llfun(df.unobs.x1[[truth.variable]], truth.params, truth.model.matrix)
-   
-    ll.x.x0 <- truth.llfun(df.unobs.x0[[truth.variable]], truth.params, truth.model.matrix)
-
-    ll.x0 <- ll.y.x0 + ll.w.x0 + ll.x.x0
-    ll.x1 <- ll.y.x1 + ll.w.x1 + ll.x.x1
-    ll.unobs <- sum(matrixStats::colLogSumExps(rbind(ll.x0, ll.x1)))
-    return(-(ll.unobs + ll.obs))
+# ----------------------------
+# Part 1: Data Preparation
+# ----------------------------
+prepare_data_sets <- function(df, outcome_formula, proxy_formula, truth_formula) {
+  # Observed data: full data frame with complete information
+  df_obs <- df
+  
+  # Predicted data: rows with missing ground truth variable
+  truth.variable <- all.vars(truth_formula)[1]
+  df_pred <- df[is.na(df[[truth.variable]]), ]
+  
+  # Create two copies of the predicted data:
+  # One assuming the ground truth equals 0, and one assuming it equals 1.
+  df_pred_x0 <- df_pred
+  df_pred_x1 <- df_pred
+  df_pred_x0[[truth.variable]] <- 0
+  df_pred_x1[[truth.variable]] <- 1
+  
+  return(list(
+    observed = df_obs,
+    predicted_x0 = df_pred_x0,
+    predicted_x1 = df_pred_x1
+  ))
 }
 
-.measerr_mle_iv <- function(df, outcome_formula, outcome_family = gaussian(), 
-                                  proxy_families, truth_families, 
-                                  maxit = 1e6, method = 'L-BFGS-B') {
-  outcome.params <- colnames(model.matrix(outcome_formula, df))
-  lower <- rep(-Inf, length(outcome.params))
-  if (outcome_family$family == 'gaussian') {
-    outcome.params <- c(outcome.params, "sigma_y")
-    lower <- c(lower, 1/1e6)
+# ----------------------------
+# Part 2: Log Likelihood Calculation
+# ----------------------------
+compute_observed_ll <- function(params, df, outcome_formula, outcome_family,
+                                proxy_formula, proxy_family,
+                                truth_formula, truth_family) {
+  # Outcome component:
+  df.outcome <- model.frame(outcome_formula, df)
+  outcome.X <- model.matrix(outcome_formula, df)
+  response.var <- all.vars(outcome_formula)[1]
+  y.obs <- with(df.outcome, eval(parse(text = response.var)))
+  
+  if (outcome_family$family == "gaussian") {
+    index_shift <- 1
+    outcome.llfun <- ll.gaussian  # user-defined likelihood function for gaussian
+  } else if ((outcome_family$family == "binomial") && (outcome_family$link == "logit")) {
+    index_shift <- 0
+    outcome.llfun <- ll.logistic  # user-defined likelihood function for logistic regression
   }
-  params <- outcome.params
+  n.out <- ncol(outcome.X)
+  outcome.params <- params[1:(n.out + index_shift)]
   
-  proxy_formulas <- conv_formula_updated(outcome_formula)
-  truth_formulas <- list()
+  # Proxy component:
+  proxy.X <- model.matrix(proxy_formula, df)
+  proxy.variable <- all.vars(proxy_formula)[1]
+  df.proxy <- model.frame(proxy_formula, df)
+  proxy.obs <- with(df.proxy, eval(parse(text = proxy.variable)))
+  n.prox <- ncol(proxy.X)
+  proxy.params <- params[(n.out + index_shift + 1):(n.out + index_shift + n.prox)]
+  proxy.llfun <- ll.logistic  # supports only binomial(logit)
   
-  for (i in seq_along(proxy_formulas)) {
-    proxy.params <- colnames(model.matrix(proxy_formulas[[i]], df))
-    params <- c(params, paste0('proxy', i, '_', proxy.params))
+  # Truth component:
+  truth.X <- model.matrix(truth_formula, df)
+  truth.variable <- all.vars(truth_formula)[1]
+  df.truth <- model.frame(truth_formula, df)
+  truth.obs <- with(df.truth, eval(parse(text = truth.variable)))
+  n.tru <- ncol(truth.X)
+  truth.params <- params[(n.out + index_shift + n.prox + 1):(n.out + index_shift + n.prox + n.tru)]
+  truth.llfun <- ll.logistic  # supports only binomial(logit)
+  
+  # Compute log likelihoods for observed data:
+  ll.outcome <- outcome.llfun(y.obs, outcome.params, outcome.X)
+  ll.proxy   <- proxy.llfun(proxy.obs, proxy.params, proxy.X)
+  ll.truth   <- truth.llfun(truth.obs, truth.params, truth.X)
+  
+  ll_obs_total <- ll.outcome + ll.proxy + ll.truth
+  return(ll_obs_total)
+}
+
+
+# ----------------------------
+# Part 3: Aggregation into the Main Likelihood Function and Updated glm_fixit
+# ----------------------------
+.measrr_mle_nll <- function(params, df, outcome_formula, outcome_family = gaussian(),
+                             proxy_formula, proxy_family = binomial(link = 'logit'),
+                             truth_formula, truth_family = binomial(link = 'logit')) {
+  
+  # Part 1: Data Preparation
+  data_sets <- prepare_data_sets(df, outcome_formula, proxy_formula, truth_formula)
+  
+  # Part 2: Log Likelihood Calculation
+  ll_obs <- compute_observed_ll(params, data_sets$observed, outcome_formula, outcome_family,
+                                proxy_formula, proxy_family, truth_formula, truth_family)
+  ll_pred <- compute_predicted_ll(params, data_sets$predicted_x0, data_sets$predicted_x1,
+                                  outcome_formula, outcome_family, proxy_formula, truth_formula)
+  
+  # Part 3: Aggregation
+  total_ll <- ll_obs + ll_pred
+  
+  # Return negative log likelihood (for minimization via optim())
+  return(-total_ll)
+}
+
+.measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
+    outcome.params <- colnames(model.matrix(outcome_formula,df))
+
+    lower <- rep(-Inf, length(outcome.params))
+    if (outcome_family$family == 'gaussian') {
+        outcome.params <- c(outcome.params, "sigma_y")
+        lower <- c(lower, 1/1e6)
+    }
+    params <- outcome.params
+    proxy.params <- colnames(model.matrix(proxy_formula, df))
+    params <- c(params, paste0('proxy_',proxy.params))
     lower <- c(lower, rep(-Inf, length(proxy.params)))
-  }
-  
-  for (i in seq_along(truth_families)) {
-    truth.params <- colnames(model.matrix(truth_formulas[[i]], df))
-    params <- c(params, paste0('truth', i, '_', truth.params))
+    truth.params <- colnames(model.matrix(truth_formula, df))
+    params <- c(params, paste0('truth_', truth.params))
     lower <- c(lower, rep(-Inf, length(truth.params)))
-  }
-  
-  start <- rnorm(length(params))
-  names(start) <- params
-  
-  fit <- optim(start, fn = .measrr_mle_nll, lower = lower, method = method, hessian = TRUE, 
-               control = list(maxit = maxit), df = df, outcome_formula = outcome_formula, 
-               outcome_family = outcome_family, proxy_formulas = proxy_formulas, 
-               proxy_families = proxy_families, truth_families = truth_families)
-  
-  return(fit)
+    start <- rnorm(length(params))
+    ##start <- rep(0.1, length(params))
+    names(start) <- params
+    fit <- optim(start, fn = .measrr_mle_nll, lower = lower, method = method, hessian = TRUE, control = list(maxit=maxit),
+                 df = df, outcome_formula = outcome_formula, outcome_family = outcome_family, proxy_formula = proxy_formula,
+                 proxy_family = proxy_family, truth_formula = truth_formula, truth_family = truth_family)
+    return(fit)
 }
+
+
 
 # Note that proxies for y are not supported in this version.
 .conv_formula <- function(formula) {
@@ -146,10 +137,6 @@
   return(formula_parts)
 }
 
-## glm(formula, family = gaussian, data, weights, subset,
-##          na.action, start = NULL, etastart, mustart, offset,
-##          control = list(...), model = TRUE, method = "glm.fit",
-##          x = FALSE, y = TRUE, singular.ok = TRUE, contrasts = NULL, ...)
 
 
 #' Misclassification correction of Generalized Linear Model with validation data
@@ -183,23 +170,35 @@ glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_family = 
   if ((proxy_family$family != "binomial") && (proxy_family$link != 'logit')) {
     stop("Unsupported `proxy_family`. The proxy family should be binomial(link='logit').", call. = FALSE)
   }
-  if ((truth_family$family != "binomial") && (truth_family$link != 'logit')) {
+  if ((truth_family$family != "binomial") || (truth_family$link != 'logit')) {
     stop("Unsupported `truth_family`. The truth family should be binomial(link='logit').", call. = FALSE)
   }
+  
   parsed_formula <- .conv_formula(formula)
-  if (isTRUE(parsed_formula$yproxy) && family$family != "binomial" && family$link != "logit") {
+  if (isTRUE(parsed_formula$yproxy) && (family$family != "binomial" || family$link != "logit")) {
     stop("Only logistic regression is supported for dependent variable with misclassification.", call. = FALSE)
   }
+  
+  # Combine primary and validation data
   df <- vctrs::vec_rbind(data, data2)
   
-  mla_function <- if (isFALSE(parsed_formula$yproxy)) .measerr_mle_iv else .measerr_mle_dv
+  if (is.null(proxy_formula)) {
+    proxy_formula <- formula(paste0(parsed_formula$proxy, "~."))
+  }
+  if (is.null(truth_formula)) {
+    truth_formula <- formula(paste0(parsed_formula$truth, "~ 1"))
+  }
   
-  res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula), 
-                      outcome_family = family, 
-                      truth_family = truth_family, 
-                      maxit = maxit, 
-                      method = method)
+  # Choose the appropriate likelihood function based on the dependent variable type.
+  mla_function <- if (isFALSE(parsed_formula$yproxy)) .measrr_mle_iv else .measrr_mle_dv        
   
+  # Call our refactored likelihood function.
+  res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula),
+                      outcome_family = family, proxy_formula = proxy_formula,
+                      truth_formula = truth_formula, truth_family = truth_family,
+                      maxit = maxit, method = method)
+  
+  # Fit naive and feasible models for comparison
   naive <- glm(formula = formula(parsed_formula$naive_formula), family = family, data = data)
   feasible <- glm(formula = formula(parsed_formula$outcome_formula), family = family, data = data2)
   
@@ -207,7 +206,9 @@ glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_family = 
   res$feasible <- feasible
   res$formula <- formula
   res$family <- family
+  res$proxy_formula <- proxy_formula
   res$proxy_family <- proxy_family
+  res$truth_formula <- truth_formula
   res$truth_family <- truth_family
   class(res) <- c("glm_fixit", class(res))
   
