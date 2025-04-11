@@ -1,98 +1,116 @@
-.measrr_mle_nll <- function(params, df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit')) {
-    df.obs <- model.frame(outcome_formula, df)
-    
-    # we'll have multiple proxy variables. So this part needs to go in a loop / function
-    proxy.variable <- all.vars(proxy_formula)[1]
-    proxy.model.matrix <- model.matrix(proxy_formula, df)
+.measrr_mle_nll <- function(
+  params,
+  df,
+  outcome_formula,
+  outcome_family = gaussian(),
+  proxy_formula,
+  proxy_family = binomial(link = 'logit'),
+  truth_formula,
+  truth_family = binomial(link = 'logit')
+) {
+  # ---- Validate input formulas ----
+  stopifnot(inherits(outcome_formula, "formula"))
+  stopifnot(inherits(proxy_formula, "formula"))
+  stopifnot(inherits(truth_formula, "formula"))
 
-    response.var <- all.vars(outcome_formula)[1]
-    y.obs <- with(df.obs,eval(parse(text=response.var)))
-    
-    if (outcome_family$family == "gaussian") {
-        ## gaussian always has `sigma_y` added to `outcome.params`; shift the index by one
-        index_shift <- 1
-        outcome.llfun <- ll.gaussian
-    }
-    if ((outcome_family$family == "binomial") && (outcome_family$link == "logit")) {
-        index_shift <- 0
-        outcome.llfun <- ll.logistic
-    }
-    # keeps track of which parameters we've read so far. 
-    param.idx <- 1
-    outcome.model.matrix <- model.matrix(outcome_formula, df)
+  # ---- Step 1: Prepare data for outcome model ----
+  df.obs <- model.frame(outcome_formula, df)  # dataframe with complete cases for outcome
+  response.var <- all.vars(outcome_formula)[1]  # name of outcome variable
+  y.obs <- with(df.obs, eval(parse(text = response.var)))  # observed response vector
+  outcome.model.matrix <- model.matrix(outcome_formula, df)  # design matrix for outcome model
 
-    ## likelihood for the fully observed data
-    n.outcome.model.covars <- dim(outcome.model.matrix)[2]
-    outcome.params <- params[param.idx:(n.outcome.model.covars + index_shift)]
-    # update param.idx since we've used the parameters in the outcome model 
-    param.idx <- param.idx + n.outcome.model.covars + index_shift
+  # Determine which likelihood function to use for the outcome model
+  if (outcome_family$family == "gaussian") {
+    index_shift <- 1  # include extra parameter for sigma_y
+    outcome.llfun <- ll.gaussian
+  }
+  if ((outcome_family$family == "binomial") && (outcome_family$link == "logit")) {
+    index_shift <- 0
+    outcome.llfun <- ll.logistic
+  }
 
-    # think about whether we needs.
-    if ((proxy_family$family=="binomial") && (proxy_family$link=='logit')) {
-        proxy.llfun <- ll.logistic
-    }
-    if ((truth_family$family=="binomial") && (truth_family$link=='logit')) {
-        truth.llfun <- ll.logistic
-    }   
-    # gets the likelihood for the outcome model
-    ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
-    
-    df.obs <- model.frame(proxy_formula,df)
-    n.proxy.model.covars <- dim(proxy.model.matrix)[2]
+  # ---- Step 2: Extract outcome model parameters ----
+  param.idx <- 1
+  n.outcome.model.covars <- ncol(outcome.model.matrix)
+  outcome.params <- params[param.idx:(n.outcome.model.covars + index_shift)]
+  param.idx <- param.idx + n.outcome.model.covars + index_shift
 
-    # gets the parameters for a proxy model. This we'll need to do in the loop. 
-    proxy.params <- params[param.idx:(n.proxy.model.covars+param.idx - 1)]
-    param.idx <- param.idx + n.proxy.model.covars
+  # ---- Step 3: Prepare data for proxy model ----
+  proxy.variable <- all.vars(proxy_formula)[1]  # name of proxy variable
+  df.obs <- model.frame(proxy_formula, df)  # subset of df for proxy model
+  proxy.model.matrix <- model.matrix(proxy_formula, df)  # design matrix
+  n.proxy.model.covars <- ncol(proxy.model.matrix)
 
-    # this gets the dataset for the observed data in a proxy model. (goes in loop)
-    proxy.obs <- with(df.obs, eval(parse(text=proxy.variable)))
+  if ((proxy_family$family == "binomial") && (proxy_family$link == "logit")) {
+    proxy.llfun <- ll.logistic
+  }
 
-    # this get the likelihood for the observed data in a proxy model.
-    ll.w.obs <- proxy.llfun(proxy.obs, proxy.params, proxy.model.matrix)
+  # Extract proxy model parameters
+  proxy.params <- params[param.idx:(param.idx + n.proxy.model.covars - 1)]
+  param.idx <- param.idx + n.proxy.model.covars
 
-    df.obs <- model.frame(truth_formula, df)
-    truth.variable <- all.vars(truth_formula)[1]
-    truth.obs <- with(df.obs, eval(parse(text=truth.variable)))
-    truth.model.matrix <- model.matrix(truth_formula,df)
-    n.truth.model.covars <- dim(truth.model.matrix)[2]
-    
-    truth.params <- params[param.idx:(n.truth.model.covars + param.idx - 1)]
-    ll.x.obs <- truth.llfun(truth.obs, truth.params, truth.model.matrix)
-    ## add the three likelihoods
-    ll.obs <- sum(ll.y.obs + ll.w.obs + ll.x.obs)
+  # Evaluate proxy outcome
+  proxy.obs <- with(df.obs, eval(parse(text = proxy.variable)))
+  ll.w.obs <- proxy.llfun(proxy.obs, proxy.params, proxy.model.matrix)  # proxy likelihood
 
-    ## likelihood for the predicted data
-    ## integrate out the "truth" variable. 
-    df.unobs <- df[is.na(df[[truth.variable]]),]
-    df.unobs.x1 <- df.unobs
-    df.unobs.x1[,truth.variable] <- 1
-    df.unobs.x0 <- df.unobs
-    df.unobs.x0[,truth.variable] <- 0
-    outcome.unobs <- with(df.unobs, eval(parse(text=response.var)))
-        
-    outcome.model.matrix.x0 <- model.matrix(outcome_formula, df.unobs.x0)
-    outcome.model.matrix.x1 <- model.matrix(outcome_formula, df.unobs.x1)
+  # ---- Step 4: Prepare data for truth model ----
+  df.obs <- model.frame(truth_formula, df)
+  truth.variable <- all.vars(truth_formula)[1]
+  truth.obs <- with(df.obs, eval(parse(text = truth.variable)))
+  truth.model.matrix <- model.matrix(truth_formula, df)
+  n.truth.model.covars <- ncol(truth.model.matrix)
 
-    ll.y.x0 <- outcome.llfun(outcome.unobs, outcome.params, outcome.model.matrix.x0)
-    ll.y.x1 <- outcome.llfun(outcome.unobs, outcome.params, outcome.model.matrix.x1)
+  if ((truth_family$family == "binomial") && (truth_family$link == "logit")) {
+    truth.llfun <- ll.logistic
+  }
 
-    proxy.model.matrix.x0 <- model.matrix(proxy_formula, df.unobs.x0)
-    proxy.model.matrix.x1 <- model.matrix(proxy_formula, df.unobs.x1)
-    proxy.unobs <- df.unobs[[proxy.variable]]
-    ll.w.x0 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.x0)
-    ll.w.x1 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.x1)
+  # Extract truth model parameters
+  truth.params <- params[param.idx:(param.idx + n.truth.model.covars - 1)]
+  ll.x.obs <- truth.llfun(truth.obs, truth.params, truth.model.matrix)
 
-    truth.model.matrix <- model.matrix(truth_formula, df.unobs.x0)
-                                        # likelihood of truth
-    ll.x.x1 <- truth.llfun(df.unobs.x1[[truth.variable]], truth.params, truth.model.matrix)
-   
-    ll.x.x0 <- truth.llfun(df.unobs.x0[[truth.variable]], truth.params, truth.model.matrix)
+  # ---- Step 5: Compute observed likelihood ----
+  ll.y.obs <- outcome.llfun(y.obs, outcome.params, outcome.model.matrix)
+  ll.obs <- sum(ll.y.obs + ll.w.obs + ll.x.obs)
 
-    ll.x0 <- ll.y.x0 + ll.w.x0 + ll.x.x0
-    ll.x1 <- ll.y.x1 + ll.w.x1 + ll.x.x1
-    ll.unobs <- sum(matrixStats::colLogSumExps(rbind(ll.x0, ll.x1)))
-    return(-(ll.unobs + ll.obs))
+  # ---- Step 6: Handle unobserved data (missing truth variable) ----
+  df.unobs <- df[is.na(df[[truth.variable]]), ]
+  df.unobs.x1 <- df.unobs
+  df.unobs.x0 <- df.unobs
+  df.unobs.x1[[truth.variable]] <- 1
+  df.unobs.x0[[truth.variable]] <- 0
+
+  # Extract unobserved outcome values
+  outcome.unobs <- with(df.unobs, eval(parse(text = response.var)))
+
+  # Compute outcome likelihood under both x=0 and x=1
+  outcome.model.matrix.x0 <- model.matrix(outcome_formula, df.unobs.x0)
+  outcome.model.matrix.x1 <- model.matrix(outcome_formula, df.unobs.x1)
+  ll.y.x0 <- outcome.llfun(outcome.unobs, outcome.params, outcome.model.matrix.x0)
+  ll.y.x1 <- outcome.llfun(outcome.unobs, outcome.params, outcome.model.matrix.x1)
+
+  # Compute proxy likelihood under both x=0 and x=1
+  proxy.model.matrix.x0 <- model.matrix(proxy_formula, df.unobs.x0)
+  proxy.model.matrix.x1 <- model.matrix(proxy_formula, df.unobs.x1)
+  proxy.unobs <- df.unobs[[proxy.variable]]
+  ll.w.x0 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.x0)
+  ll.w.x1 <- proxy.llfun(proxy.unobs, proxy.params, proxy.model.matrix.x1)
+
+  # Compute truth likelihood under both x=0 and x=1
+  truth.model.matrix <- model.matrix(truth_formula, df.unobs.x0)  # same model matrix
+  ll.x.x0 <- truth.llfun(df.unobs.x0[[truth.variable]], truth.params, truth.model.matrix)
+  ll.x.x1 <- truth.llfun(df.unobs.x1[[truth.variable]], truth.params, truth.model.matrix)
+
+  # Combine likelihoods under each scenario
+  ll.x0 <- ll.y.x0 + ll.w.x0 + ll.x.x0
+  ll.x1 <- ll.y.x1 + ll.w.x1 + ll.x.x1
+
+  # ---- Step 7: Marginalize over missing truth variable (log-sum-exp trick) ----
+  ll.unobs <- sum(matrixStats::colLogSumExps(rbind(ll.x0, ll.x1)))
+
+  # ---- Step 8: Return negative log-likelihood ----
+  return(-(ll.unobs + ll.obs))
 }
+
 
 .measerr_mle_iv <- function(df, outcome_formula, outcome_family = gaussian(), 
                                   proxy_families, truth_families, 
@@ -174,30 +192,42 @@
 #' }
 #' @importFrom stats binomial coef confint dnorm gaussian glm model.frame model.matrix optim plogis qnorm rnorm
 #' @export
-glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_family = binomial(link='logit'), truth_family = binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
+glm_fixit <- function(formula, family = gaussian(), data, data2, 
+                      proxy_family = binomial(link = 'logit'), 
+                      truth_family = binomial(link = 'logit'), 
+                      maxit = 1e6, method = 'L-BFGS-B') {
+  
+  # Basic input validation
+  stopifnot(inherits(formula, "formula"))
+  stopifnot(inherits(family, "family"))
+  stopifnot(is.data.frame(data), is.data.frame(data2))
+
+  # Family/link compatibility checks
   if ((proxy_family$family != "binomial") && (proxy_family$link != 'logit')) {
     stop("Unsupported `proxy_family`. The proxy family should be binomial(link='logit').", call. = FALSE)
   }
   if ((truth_family$family != "binomial") && (truth_family$link != 'logit')) {
     stop("Unsupported `truth_family`. The truth family should be binomial(link='logit').", call. = FALSE)
   }
+
   parsed_formula <- .conv_formula(formula)
   if (isTRUE(parsed_formula$yproxy) && family$family != "binomial" && family$link != "logit") {
     stop("Only logistic regression is supported for dependent variable with misclassification.", call. = FALSE)
   }
+
   df <- vctrs::vec_rbind(data, data2)
-  
+
   mla_function <- if (isFALSE(parsed_formula$yproxy)) .measerr_mle_iv else .measerr_mle_dv
-  
+
   res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula), 
                       outcome_family = family, 
                       truth_family = truth_family, 
                       maxit = maxit, 
                       method = method)
-  
+
   naive <- glm(formula = formula(parsed_formula$naive_formula), family = family, data = data)
   feasible <- glm(formula = formula(parsed_formula$outcome_formula), family = family, data = data2)
-  
+
   res$naive <- naive
   res$feasible <- feasible
   res$formula <- formula
@@ -205,7 +235,7 @@ glm_fixit <- function(formula, family = gaussian(), data, data2, proxy_family = 
   res$proxy_family <- proxy_family
   res$truth_family <- truth_family
   class(res) <- c("glm_fixit", class(res))
-  
+
   return(res)
 }
 
