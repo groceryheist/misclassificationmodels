@@ -72,6 +72,7 @@ compute_observed_ll <- function(params, df, outcome_formula, outcome_family,
   return(ll_obs_total)
 }
 
+
 compute_predicted_ll <- function(params, df_pred_x0, df_pred_x1,
                                  outcome_formula, outcome_family,
                                  proxy_formula, truth_formula) {
@@ -125,7 +126,7 @@ compute_predicted_ll <- function(params, df_pred_x0, df_pred_x1,
 # ----------------------------
 # Part 3: Aggregation into the Main Likelihood Function and Updated glm_fixit
 # ----------------------------
-.measrr_mle_nll <- function(params, df, outcome_formula, outcome_family = gaussian(),
+.measerr_mle_nll <- function(params, df, outcome_formula, outcome_family = gaussian(),
                              proxy_formula, proxy_family = binomial(link = 'logit'),
                              truth_formula, truth_family = binomial(link = 'logit')) {
   
@@ -135,6 +136,7 @@ compute_predicted_ll <- function(params, df_pred_x0, df_pred_x1,
   # Part 2: Log Likelihood Calculation
   ll_obs <- compute_observed_ll(params, data_sets$observed, outcome_formula, outcome_family,
                                 proxy_formula, proxy_family, truth_formula, truth_family)
+
   ll_pred <- compute_predicted_ll(params, data_sets$predicted_x0, data_sets$predicted_x1,
                                   outcome_formula, outcome_family, proxy_formula, truth_formula)
   
@@ -142,14 +144,63 @@ compute_predicted_ll <- function(params, df_pred_x0, df_pred_x1,
   total_ll <- ll_obs + ll_pred
   
   # Return negative log likelihood (for minimization via optim())
-  return(-total_ll)
+  result <- sum(-total_ll)
+  print(result)
+}
+
+.conv_formula <- function(formula) {
+    res <- list()
+    tokenized_formula <- strsplit(as.character(formula), " ")
+    stopifnot("||" %in% unlist(tokenized_formula))
+    stopifnot(sum(unlist(tokenized_formula) == "||") == 1)
+    res$yproxy <- "||" %in% tokenized_formula[[2]]
+    if (!res$yproxy) {
+        sign_idx <- which(tokenized_formula[[3]] == "||")
+        res$truth <- tokenized_formula[[3]][sign_idx - 1]
+        res$proxy <- tokenized_formula[[3]][sign_idx + 1]
+        res$outcome_formula <- paste(c(tokenized_formula[[2]], "~", tokenized_formula[[3]][setdiff(seq_along(tokenized_formula[[3]]), c(sign_idx, sign_idx + 1))]), collapse = " ")
+        res$naive_formula <- paste(c(tokenized_formula[[2]], "~", tokenized_formula[[3]][setdiff(seq_along(tokenized_formula[[3]]), c(sign_idx, sign_idx - 1))]), collapse = " ")
+    } else {
+        sign_idx <- which(tokenized_formula[[2]] == "||")
+        res$truth <- tokenized_formula[[2]][sign_idx - 1]
+        res$proxy <- tokenized_formula[[2]][sign_idx + 1]
+        res$outcome_formula <- paste(c(res$truth, "~", tokenized_formula[[3]]), collapse = " ")
+        res$naive_formula <- paste(c(res$proxy, "~", tokenized_formula[[3]]), collapse = " ")
+    }
+    return(res)
+}
+
+
+.measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
+    outcome.params <- colnames(model.matrix(outcome_formula,df))
+
+    lower <- rep(-Inf, length(outcome.params))
+    if (outcome_family$family == 'gaussian') {
+        outcome.params <- c(outcome.params, "sigma_y")
+        lower <- c(lower, 1/1e6)
+    }
+    params <- outcome.params
+    proxy.params <- colnames(model.matrix(proxy_formula, df))
+    params <- c(params, paste0('proxy_',proxy.params))
+    lower <- c(lower, rep(-Inf, length(proxy.params)))
+    truth.params <- colnames(model.matrix(truth_formula, df))
+    params <- c(params, paste0('truth_', truth.params))
+    lower <- c(lower, rep(-Inf, length(truth.params)))
+    start <- rnorm(length(params))
+    ##start <- rep(0.1, length(params))
+    names(start) <- params
+    fit <- optim(start, fn = .measerr_mle_nll, lower = lower, method = method, hessian = TRUE, control = list(maxit=maxit),
+                 df = df, outcome_formula = outcome_formula, outcome_family = outcome_family, proxy_formula = proxy_formula,
+                 proxy_family = proxy_family, truth_formula = truth_formula, truth_family = truth_family)
+    return(fit)
 }
 
 glm_fixit <- function(formula, family = gaussian(), data, data2,
                       proxy_formula = NULL, proxy_family = binomial(link = 'logit'),
                       truth_formula = NULL, truth_family = binomial(link = 'logit'),
                       maxit = 1e6, method = 'L-BFGS-B') {
-  
+
+  print("in glm_fixit")
   if ((proxy_family$family != "binomial") || (proxy_family$link != 'logit')) {
     stop("Unsupported `proxy_family`. The proxy family should be binomial(link='logit').", call. = FALSE)
   }
@@ -173,8 +224,9 @@ glm_fixit <- function(formula, family = gaussian(), data, data2,
   }
   
   # Choose the appropriate likelihood function based on the dependent variable type.
-  mla_function <- if (isFALSE(parsed_formula$yproxy)) .measrr_mle_iv else .measrr_mle_dv        
-  
+  mla_function <- if (isFALSE(parsed_formula$yproxy)) .measerr_mle_iv else .measerr_mle_dv        
+
+  print("calling llik")
   # Call our refactored likelihood function.
   res <- mla_function(df, outcome_formula = formula(parsed_formula$outcome_formula),
                       outcome_family = family, proxy_formula = proxy_formula,
