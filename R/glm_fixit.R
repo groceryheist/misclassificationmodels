@@ -93,7 +93,7 @@ compute_observed_ll <- function(params, df, outcome_formula, outcome_family,
   total_ll <- ll_obs + ll_pred
   
   # Return negative log likelihood (for minimization via optim())
-  return(-total_ll)
+  return sum(-total_ll)
 }
 
 .measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
