@@ -131,11 +131,16 @@
   return(fit)
 }
 
+# Note that proxies for y are not supported in this version.
 .conv_formula <- function(formula) {
   # split the formula
-    tokenized_formula <- strsplit(as.character(formula), " ")
-    stopifnot("||" %in% unlist(tokenized_formula))
+  tokenized_formula <- strsplit(as.character(formula), " ")
+  stopifnot("||" %in% unlist(tokenized_formula))
   formula_parts <- strsplit(deparse(formula), "\\|\\|")[[1]]
+
+  ## this line has an issue. Each formula part needs a dependent variable.
+  ## E.g., y ~ x || w + z -> list("y ~ x + z", "x ~ w")
+  ## E.g., y ~ x || w + a || b + z -> list("y ~ x + a + z", "x ~ w", "a ~ b")
   formula_parts <- lapply(formula_parts, function(f) as.formula(trimws(f)))
   names(formula_parts) <- sapply(formula_parts, function(f) as.character(f[[2]]))
   return(formula_parts)
