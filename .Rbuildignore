@@ -2,3 +2,5 @@
 ^README\.html$
 ^LICENSE\.md$
 ^rawdata
+^.*\.Rproj$
+^\.Rproj\.user$
