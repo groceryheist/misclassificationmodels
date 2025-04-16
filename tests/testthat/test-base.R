@@ -18,13 +18,18 @@ test_that("Base case IV Binomial", {
 
 test_that(".conv_formula works correctly", {
   f <- .conv_formula(y ~ x || w ~ z || y ~ w)
-  
+
   expect_type(f, "list")
   expect_true("outcome_formula" %in% names(f))
   expect_true("naive_formula" %in% names(f))
   expect_true("proxy_formula" %in% names(f))
-  
+
   expect_true(inherits(f$outcome_formula, "formula"))
   expect_true(inherits(f$proxy_formula, "formula"))
   expect_true(inherits(f$naive_formula, "formula"))
+})
+
+test_that(".conv_formula works with multiple proxy variables", {
+  f <- .conv_formula(y ~ x || w ~ x + a || b ~ x || y ~ 1)
+  expect_type(f$proxy_formula, "list")
 })
