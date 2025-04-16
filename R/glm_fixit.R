@@ -72,7 +72,6 @@ compute_observed_ll <- function(params, df, outcome_formula, outcome_family,
   return(ll_obs_total)
 }
 
-
 # ----------------------------
 # Part 3: Aggregation into the Main Likelihood Function and Updated glm_fixit
 # ----------------------------
@@ -93,7 +92,7 @@ compute_observed_ll <- function(params, df, outcome_formula, outcome_family,
   total_ll <- ll_obs + ll_pred
   
   # Return negative log likelihood (for minimization via optim())
-  return sum(-total_ll)
+  sum(-total_ll)
 }
 
 .measerr_mle_iv <- function(df, outcome_formula, outcome_family=gaussian(), proxy_formula, proxy_family=binomial(link='logit'), truth_formula, truth_family=binomial(link='logit'), maxit = 1e6, method = 'L-BFGS-B') {
@@ -136,7 +135,6 @@ compute_observed_ll <- function(params, df, outcome_formula, outcome_family,
   names(formula_parts) <- sapply(formula_parts, function(f) as.character(f[[2]]))
   return(formula_parts)
 }
-
 
 
 #' Misclassification correction of Generalized Linear Model with validation data
