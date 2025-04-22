@@ -72,9 +72,17 @@ require(data.table)
 df <- simulate_data(seed = 12121, Bxy = 0, N = 5000, m = 300, prediction_accuracy = .7)
 df$x <- df$x.obs
 
-df %>% filter(is.na(x)) %>% select(-x, -x.obs, -w) %>% rename(w = `w_pred`) %>% as.data.frame -> research_data
+research_data <- df |>
+  filter(is.na(x)) |>
+  select(-x, -x.obs, -w) |>
+  rename(w = `w_pred`) |>
+  as.data.frame()
 
-df %>% filter(!is.na(x)) %>% select(-x.obs, -w) %>% rename(w = `w_pred`) %>% as.data.frame -> val_data
+val_data <- df |>
+  filter(!is.na(x)) |>
+  select(-x.obs, -w) |>
+  rename(w = `w_pred`) |>
+  as.data.frame()
 
 usethis::use_data(research_data, overwrite = TRUE)
 usethis::use_data(val_data, overwrite = TRUE)
@@ -83,8 +91,49 @@ df2 <- simulate_data_y(seed = 12121, Bxy = 0.0, N = 7000, m = 500, prediction_ac
 
 df2$y <- df2$y.obs
 
-df2 %>% filter(!is.na(y)) %>% select(-y.obs, -w, -ystar) %>% rename(w = `w_pred`) %>% as.data.frame -> val_data2
+val_data2 <- df2 |>
+  filter(!is.na(y)) |>
+  select(-y.obs, -w, -ystar) |>
+  rename(w = `w_pred`) |>
+  as.data.frame()
 
-df2 %>% filter(is.na(y)) %>% select(-y.obs, -w, -ystar) %>% rename(w = `w_pred`) %>% select(w, x, z) %>% as.data.frame -> research_data2
-usethis::use_data(research_data2, overwrite = TRUE)
+research_data_2 <- df2 |>
+  filter(is.na(y)) |>
+  select(-y.obs, -w, -ystar) |>
+  rename(w = `w_pred`) |>
+  select(w, x, z) |>
+  as.data.frame()
+
+usethis::use_data(research_data_2, overwrite = TRUE)
 usethis::use_data(val_data2, overwrite = TRUE)
+
+research_data <- research_data |> rename(a = z, v = w)
+
+df <- simulate_data(seed = 12123, Bxy = 0.3, N = 5000, m = 300, prediction_accuracy = 0.8)
+
+df <- df |>
+  rename(a = x, b = y, c = z, a.obs = x.obs, v = w, v_pred = w_pred) |>
+  mutate(observed = is.na(a.obs)) |>
+  arrange(observed, a.obs, v, b, c) |>
+  mutate(idx = row_number())
+
+df2 <- simulate_data(seed = 12122, Bxy = 0.3, N = 5000, m = 300, prediction_accuracy = 0.8)
+
+df2$x <- df2$x.obs
+
+df2 <- df2 |>
+  mutate(observed = is.na(x.obs)) |>
+  arrange(observed, x.obs, x, w, w_pred) |>
+  mutate(idx = row_number())
+
+research_data_3 <- merge(df, df2, by = "idx") |> mutate(y = rnorm(n(), mean = (y + b) / 2, sd = sqrt(var(y + b))))
+
+val_data_3 <- research_data_3 |>
+  filter(!is.na(x) & !is.na(a)) |>
+  select(v=v_pred, w=w_pred, x, y, a, c)
+
+research_data_3 <- research_data_3 |> select(y, x, w=w_pred, z, v=v_pred, a)  |> filter(is.na(x) | is.na(a))
+
+nrow(research_data_3)
+usethis::use_data(research_data_3, overwrite = TRUE)
+usethis::use_data(val_data_3, overwrite = TRUE)

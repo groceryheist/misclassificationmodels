@@ -1,7 +1,7 @@
 #' Synthetic datasets
 #'
 #' @description
-#'`research_data`, `val_data`, `research_data2`, and `val_data2` are synthetic datasets for demonstrating how this package works.
+#'`research_data`, `val_data`, `research_data_2`, `val_data_2`, `research_data_3`, and `val_data_3` are synthetic datasets for demonstrating how this package works.
 #'
 #'`research_data*` datasets represent the primary data wherein a **proxy** variable (*w*) contains misclassifications from an automated classifer. `val_data*` datasets represent the validation data wherein both **groundtruth** (e.g. from human annotation, can either be *x* or *y*) and *w* are included. Theoretically, we are not interested in studying *w* per se. Suppose the groundtruth is *x* and we are interested in the relationship between *x* and *y*; we want to estimate the regression coefficient \eqn{B_{xy}}. But we use *w* as a low-cost proxy of the groundtruth *x* and can only estimate \eqn{B_{wy}}.
 #'
@@ -27,7 +27,13 @@
 "val_data"
 
 #' @rdname research_data
-"val_data2"
+"val_data_2"
 
 #' @rdname research_data
-"research_data2"
+"research_data_2"
+
+#' @rdname research_data
+"research_data_3"
+
+#' @rdname research_data
+"val_data_3"

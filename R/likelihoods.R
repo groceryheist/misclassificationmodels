@@ -7,8 +7,10 @@ ll.logistic <- function(outcome, model.params, model.matrix) {
     return(ll)
 }
 
-# sigma is always the last model parameter
 ll.gaussian <- function(outcome, model.params, model.matrix) {
-    ll <- vector(mode='numeric', length=length(outcome))
-    ll[outcome == 1] <- dnorm(outcome, model.params[1:(length(model.params)-1)] %*% t(model.matrix), sd = model.params[length(model.params)], log = TRUE)
+  beta <- model.params[1:(length(model.params) - 1)]
+  sigma <- model.params[length(model.params)]
+  stopifnot(ncol(model.matrix) == length(beta))
+  mu <- as.vector(model.matrix %*% beta)
+  dnorm(outcome, mean = mu, sd = sigma, log = TRUE)
 }

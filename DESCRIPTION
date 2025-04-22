@@ -22,5 +22,6 @@ Depends:
 LazyData: true
 Imports: 
     matrixStats,
-    vctrs
+    vctrs,
+    stringr
 VignetteBuilder: knitr
