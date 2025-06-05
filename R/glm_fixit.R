@@ -120,9 +120,10 @@ compute_predicted_ll <- function(params, df,
 
   # now for each possible combination of latent variables, we compute the likelihood
   ll_grid <- NULL
-  for(grid_idx in 1:dim(integration_grid)[[1]]){
+  for (grid_idx in 1:dim(integration_grid)[[1]]) {
     # create the data frame for this integration part
-    Xval <- unlist(integration_grid[grid_idx, ,drop=FALSE])
+
+    Xval <- unlist(integration_grid[grid_idx, , drop = FALSE])
     for (i in 1:length(Xval)) {
       df[[names(Xval)[[i]]]] <- Xval[[i]]
     }
@@ -281,6 +282,7 @@ glm_fixit <- function(..., family = gaussian(), data, data2,
                       maxit = 1e6, method = 'L-BFGS-B') {
 
   formulas <- list(...)
+
   f_list <- .conv_formulas(formulas)
   # Basic input validation
   stopifnot(inherits(f_list$outcome_formula, "formula"))
@@ -312,28 +314,44 @@ glm_fixit <- function(..., family = gaussian(), data, data2,
   
   ## # Choose the appropriate likelihood function based on the dependent variable type.
   mla_function <- if (isFALSE(f_list$yproxy)) measerr_mle_iv else measerr_mle_dv
-  
-  n_proxy_params <- sum(sapply(proxy_formulas, function(f) {
-    ncol(model.matrix(f, df))
-  }))
-  
-  n_truth_params <- sum(sapply(truth_formulas, function(f) {
-    ncol(model.matrix(f, df))
-  }))
 
-
-  if (family$family == "gaussian") {
-    n_outcome_params <- length(colnames(model.matrix(outcome_formula, df))) + 1
-    lower <- c(rep(-Inf, n_outcome_params - 1), 0.00000001, rep(-Inf, n_proxy_params + n_truth_params))
-  } else {
-    n_outcome_params <- length(colnames(model.matrix(outcome_formula, df)))
-    lower <- rep(-Inf, n_outcome_params + n_proxy_params + n_truth_params)
+  n_proxy_params <- 0
+  proxy_param_names <- c()
+  for(f in proxy_formulas){
+    f_terms <- terms(f)
+    proxy_resp <- attr(f_terms, "variables")[[attr(f_terms, "response") + 1]]
+    proxy_model_matrix <- model.matrix(f, df)
+    new_proxy_param_names <- paste0(colnames(proxy_model_matrix), '_', proxy_resp, "_proxy")
+    proxy_param_names <- c(proxy_param_names, new_proxy_param_names)
+    n_proxy_params <- n_proxy_params + length(new_proxy_param_names)
   }
 
+  n_truth_params <- 0
+  truth_param_names <- c()
+  for(f in truth_formulas){
+    f_terms <- terms(f)
+    truth_resp <- attr(f_terms, "variables")[[attr(f_terms, "response") + 1]]
+    truth_model_matrix <- model.matrix(f, df)
+    new_truth_param_names <- paste0(colnames(truth_model_matrix), '_', truth_resp, "_truth")
+    truth_param_names <- c(truth_param_names, new_truth_param_names)
+    n_truth_params <- n_truth_params + length(new_truth_param_names)
+  }
+
+  outcome_model_mat <- model.matrix(outcome_formula, df)
+  outcome_param_names <- colnames(outcome_model_mat)
+  if (family$family == "gaussian") {
+    outcome_param_names <- c(outcome_param_names, "sigma")
+    n_outcome_params <- length(outcome_param_names) 
+    lower <- c(rep(-Inf, n_outcome_params - 1), 0.00000001, rep(-Inf, n_proxy_params + n_truth_params))
+  } else {
+    n_outcome_params <- length(outcome_param_names)
+    lower <- rep(-Inf, n_outcome_params + n_proxy_params + n_truth_params)
+  }
 
   params <- abs(rnorm(n_outcome_params +
                         n_proxy_params +
                         n_truth_params, sd = 0.01))
+  names(params) <- c(outcome_param_names, proxy_param_names, truth_param_names)
 
   missing_idx <- rep(FALSE, nrow(df))
   for (tf in truth_formulas) {
